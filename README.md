@@ -43,8 +43,8 @@ This is **not full decompilation or ARM emulation**. The browser supplies the ho
 Remaining fidelity gaps include:
 
 - the original PICA200 material/shader combiner is approximated with Three.js materials;
-- the 48-frame `neko_hopping_jump` CANM clip is present in the ROM, but this unusually early 2010 CANM transform layout is not yet translated, so the real skeleton is currently shown in its bind pose;
-- effect/goal CMDLs in this prototype are emitter containers with no static triangle stream; their original ROM textures are used as billboards until that emitter format is translated;
+- the original 48-frame `neko_hopping_jump` CANM clip is decoded (18 bone tracks / 59 Hermite curves) and drives the real 24-bone skeleton; exact NintendoWare controller cadence is still being traced, so the browser currently treats it as a one-shot pogo clip;
+- the prototype's 16 `PEMT` emitter containers are parsed with exact object boundaries and bound to the original ARM effect slots; the surrounding NintendoWare particle integrator is still approximated by a Three.js sprite host;
 - collision is a browser translation of the recovered floor extents rather than the complete original engine collision subsystem;
 - camera/stereoscopic presentation is browser-side.
 
