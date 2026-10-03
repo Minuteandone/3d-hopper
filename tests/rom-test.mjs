@@ -1,6 +1,7 @@
 import fs from 'node:fs';
 import { HopperRom } from '../js/rom.js';
 import { parseTextures, decodeTexture, textureMapFromRom } from '../js/cgfx.js';
+import { decodeBcstm } from '../js/audio.js';
 
 const path=process.argv[2];
 if(!path) throw new Error('usage: node tests/rom-test.mjs /path/to/3D_Hopper.app');
@@ -22,4 +23,15 @@ for(const t of title){
 const all=textureMapFromRom(rom);
 console.log('textures', [...all.values()].map(t=>`${t.name}:${t.width}x${t.height}/${t.formatName}`).join(', '));
 if(all.size<20) throw new Error(`expected 20+ textures, got ${all.size}`);
-console.log('ROM parser + CGFX texture decoder OK');
+
+const bgm=decodeBcstm(rom.get('sound/stream/DUMMY_LOOPED.bcstm'));
+if(bgm.sampleRate!==32000||bgm.channels.length!==2||bgm.sampleCount!==245760||!bgm.loop){
+  throw new Error(`unexpected looping BCSTM metadata: ${bgm.sampleRate} Hz, ${bgm.channels.length} ch, ${bgm.sampleCount} samples, loop=${bgm.loop}`);
+}
+
+const congrats=decodeBcstm(rom.get('sound/stream/HOPPER_BGM_CONGRATS.bcstm'));
+if(congrats.sampleRate!==32000||congrats.channels.length!==2||congrats.sampleCount!==465610||congrats.loop){
+  throw new Error(`unexpected congratulations BCSTM metadata: ${congrats.sampleRate} Hz, ${congrats.channels.length} ch, ${congrats.sampleCount} samples, loop=${congrats.loop}`);
+}
+
+console.log('ROM parser + CGFX texture decoder + BCSTM audio decoder OK');
