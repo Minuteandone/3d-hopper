@@ -12,7 +12,7 @@
     <header class="topbar">
       <div>
         <h1>3D Hopper <span>web port</span></h1>
-        <p>Clean-room browser reimplementation · original assets loaded from your ROM</p>
+        <p>ARM-translated browser port · original code data + assets loaded from your ROM</p>
       </div>
       <label class="rom-button">
         <input id="romInput" type="file" accept=".app,.cxi,application/octet-stream" />
@@ -81,7 +81,7 @@
 
     <details class="about">
       <summary>What is this?</summary>
-      <p>This is a clean-room playable reimplementation of the E3 2010 <em>Tech Demo: 3D Hopper</em>. It does not emulate the original ARM executable. Instead, it reads the original prototype's asset filesystem in your browser and uses decoded CGFX textures and BCSTM audio in a new Three.js game implementation.</p>
+      <p>This port reads the E3 2010 <em>Tech Demo: 3D Hopper</em> executable and translates identified ARM gameplay routines/data into JavaScript at runtime: the four original stage layouts, floor construction rules, moving-platform logic, and core pogo physics. It is not full CPU emulation; rendering and some engine/collision plumbing are still Three.js replacements.</p>
     </details>
   </main>
 
