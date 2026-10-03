@@ -2,7 +2,7 @@ import * as THREE from 'https://cdn.jsdelivr.net/npm/three@0.186.1/build/three.m
 import { createModelInstance, disposeModelInstance } from './model-renderer.js';
 import { gridCoordinate, transformControlVector } from './executable.js';
 import {
-  createGameState,activeStageRecords,createFloorRuntime,tickFloorRuntime,noteFall,findStartRecord,
+  createGameState,activeStageRecords,createFloorRuntime,tickFloorRuntime,noteFall,findStartRecord,updateHorizontalVelocity,
 } from './runtime.js';
 
 const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
@@ -179,19 +179,6 @@ export class HopperGame {
     }
   }
 
-  #steer(input){
-    const p=this.program.physics;
-    if(this.player.grounded){
-      const tx=input.x*p.groundedInputScale,tz=input.z*p.groundedInputScale;
-      if(Math.abs(this.player.vel.x)<Math.abs(tx))this.player.vel.x=tx;
-      if(Math.abs(this.player.vel.z)<Math.abs(tz))this.player.vel.z=tz;
-    }else{
-      const tx=input.x*p.inputScale,tz=input.z*p.inputScale;
-      this.player.vel.x+=(tx-this.player.vel.x)*p.airVelocityLerp;
-      this.player.vel.z+=(tz-this.player.vel.z)*p.airVelocityLerp;
-    }
-  }
-
   #landingFloor(previous,current){
     if(this.player.vel.y>0)return null;
     let best=null;const skin=this.program.physics.collisionSkin;
@@ -242,7 +229,7 @@ export class HopperGame {
       return;
     }
 
-    const input=this.#inputVector();this.#steer(input);
+    const input=this.#inputVector();
     this.player.grounded=false;
     const state2=this.phase===2;
     this.player.vel.y-=state2?this.program.physics.state2GravityPerUpdate:this.program.physics.gravityPerUpdate;
@@ -251,7 +238,10 @@ export class HopperGame {
     const current=this.player.pos.clone().add(displacement);
     this.player.pos.copy(current);
     const floor=this.#landingFloor(previous,current);if(floor)this.#land(floor);
-    if(this.player.pos.y<this.program.physics.failY)this.#fall();
+    if(this.player.pos.y<this.program.physics.failY){this.#fall();return;}
+    if(!this.playing)return;
+    const horizontal=updateHorizontalVelocity(this.player.vel,input,!!floor,this.program.physics);
+    this.player.vel.x=horizontal.x;this.player.vel.z=horizontal.z;
     this.callbacks.onTime?.(this.elapsedFrames/60);
     // The original CMDL root is authored at the pogo contact point.
     this.playerMesh.position.copy(this.player.pos);
