@@ -14,13 +14,16 @@ function checked(bytes,o,n,label){if(o<0||n<0||o+n>bytes.length)throw new Error(
 function parseHermite128Segment(bytes,view,offset){
   checked(bytes,offset,0x18,'CANM curve segment');
   const startFrame=f32(view,offset),endFrame=f32(view,offset+4),flags=u32(view,offset+8);
-  const interpolation=flags&0xf,quantization=flags>>>5;
-  if(interpolation!==8||quantization!==0)throw new Error(`Unsupported Hopper CANM curve segment flags 0x${flags.toString(16)}.`);
+  // CGFX FloatSegment packs interpolation in bits 2..4 and quantization in
+  // bits 5..7. Hopper's segments use flags 0x8 => interpolation code 2,
+  // quantization 0 (Hermite128).
+  const interpolation=(flags>>>2)&7,quantization=(flags>>>5)&7;
+  if(quantization!==0)throw new Error(`Unsupported Hopper CANM quantization ${quantization} (flags 0x${flags.toString(16)}).`);
   const keyCount=u32(view,offset+0x0c),speed=f32(view,offset+0x10),keys=[];
   let p=offset+0x14;
   checked(bytes,p,keyCount*16,'CANM Hermite keys');
   for(let i=0;i<keyCount;i++,p+=16)keys.push({frame:f32(view,p),value:f32(view,p+4),inSlope:f32(view,p+8),outSlope:f32(view,p+12)});
-  return {offset,startFrame,endFrame,flags,interpolation:'hermite',quantization:'Hermite128',speed,keys};
+  return {offset,startFrame,endFrame,flags,interpolation,quantization:'Hermite128',speed,keys};
 }
 
 export function parseFloatCurve(input,offset){
