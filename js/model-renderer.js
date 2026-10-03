@@ -61,7 +61,7 @@ export function createModelInstance(model,textures,{shadows=true}={}){
     const shape=model.shapes[meshInfo.shapeIndex];if(!shape)continue;
     const material=materials[meshInfo.materialIndex]??new THREE.MeshStandardMaterial({color:0xffffff});
     for(const primitiveSet of shape.primitiveSets)for(const primitive of primitiveSet.primitives)for(const stream of primitive.indexStreams){
-      if(!stream.visible||stream.indices.length<3)continue;
+      if(stream.indices.length<3)continue;
       const geometry=makeGeometry(shape,primitiveSet,stream,bones);
       const object=bones?new THREE.SkinnedMesh(geometry,material):new THREE.Mesh(geometry,material);
       object.name=meshInfo.name||`${model.name}_mesh`;object.castShadow=shadows;object.receiveShadow=shadows;
