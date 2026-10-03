@@ -26,7 +26,7 @@
         <div class="boot-card">
           <div class="pogo-icon" aria-hidden="true">🐱<span></span></div>
           <h2>Load your original build</h2>
-          <p>The ROM stays on this device. The site reads the prototype ROFS and decodes the game's CGFX textures locally.</p>
+          <p>The ROM stays on this device. The site reads the prototype ROFS and decodes the game's CGFX textures and BCSTM audio locally.</p>
           <label class="rom-button big">
             <input id="romInputBig" type="file" accept=".app,.cxi,application/octet-stream" />
             <span>Open 3D_Hopper.app</span>
@@ -75,12 +75,13 @@
       <div><b>Move:</b> WASD / arrow keys / touch / gamepad stick</div>
       <div><b>Bounce:</b> automatic — this is a pogo cat, rules are rules 🐱</div>
       <label class="depth-control"><span>Depth</span><input id="depth" type="range" min="0" max="100" value="55" /></label>
+      <button id="audioToggle" class="audio-toggle" type="button" aria-pressed="false">🔊 ROM audio</button>
       <div id="romStatus" class="rom-status">Waiting for ROM…</div>
     </section>
 
     <details class="about">
       <summary>What is this?</summary>
-      <p>This is a clean-room playable reimplementation of the E3 2010 <em>Tech Demo: 3D Hopper</em>. It does not emulate the original ARM executable. Instead, it reads the original prototype's asset filesystem in your browser and uses those decoded textures in a new Three.js game implementation.</p>
+      <p>This is a clean-room playable reimplementation of the E3 2010 <em>Tech Demo: 3D Hopper</em>. It does not emulate the original ARM executable. Instead, it reads the original prototype's asset filesystem in your browser and uses decoded CGFX textures and BCSTM audio in a new Three.js game implementation.</p>
     </details>
   </main>
 
