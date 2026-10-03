@@ -44,7 +44,9 @@ async function openRom(file){
         if(meta.rebuild)status.textContent=`Original Stage 3 rescue counter: ${meta.rescueCounter}`;
       },
       onWin:stats=>{
-        if(stats.final)audio?.playCongrats();
+        // Original state-3 completion timing is still being translated; do not
+        // fire HOPPER_BGM_CONGRATS at our placeholder collision boundary.
+        audio?.stop();
         nextStage=stats.final?0:stats.stageIndex+1;
         $('#againButton').textContent=stats.final?'Play from Stage 1':'Next original stage';
         $('#finishStats').textContent=`Stage ${stats.stage}/4 · ${stats.time.toFixed(1)} seconds · ${stats.falls} fall${stats.falls===1?'':'s'} · layout translated from ARM`;
