@@ -22,8 +22,14 @@ jobs:
           node --check js/cgfx.js
           node --check js/models.js
           node --check js/model-renderer.js
+          node --check js/animation.js
+          node --check js/emitters.js
+          node --check js/effects.js
           node --check js/prototype-code.js
           node --check js/audio.js
           node --check js/game.js
           node --check js/main.js
           node --check tests/rom-test.mjs
+          node --check tests/animation-test.mjs
+          node --check tests/emitters-test.mjs
+          node --check tests/effects-test.mjs
