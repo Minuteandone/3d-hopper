@@ -1,5 +1,6 @@
 import * as THREE from 'https://cdn.jsdelivr.net/npm/three@0.186.1/build/three.module.js';
 import { canvasFromTexture } from './cgfx.js';
+import { createModelInstance, disposeModelInstance } from './model-renderer.js';
 import { gridCoordinate } from './executable.js';
 import {
   createGameState,activeStageRecords,createFloorRuntime,tickFloorRuntime,noteFall,findStartRecord,
@@ -17,8 +18,8 @@ function makeTexture(asset) {
 }
 
 export class HopperGame {
-  constructor(host,assets,program,callbacks={}) {
-    this.host=host;this.assets=assets;this.program=program;this.callbacks=callbacks;
+  constructor(host,assets,models,program,callbacks={}) {
+    this.host=host;this.assets=assets;this.models=models;this.program=program;this.callbacks=callbacks;
     this.renderer=new THREE.WebGLRenderer({antialias:true,alpha:false,powerPreference:'high-performance'});
     this.renderer.setPixelRatio(Math.min(devicePixelRatio,2));
     this.renderer.shadowMap.enabled=true;this.renderer.shadowMap.type=THREE.PCFSoftShadowMap;
@@ -61,20 +62,10 @@ export class HopperGame {
   }
 
   #makePlayer(){
-    const catTex=this.assets.get('nekopper')||this.assets.get('flockycmp')||this.assets.get('hopping');
-    const fur=catTex?new THREE.MeshStandardMaterial({map:makeTexture(catTex),roughness:.85}):new THREE.MeshStandardMaterial({color:0xd98746,roughness:.9});
-    const dark=new THREE.MeshStandardMaterial({color:0x37291f,roughness:.9});
-    const metal=new THREE.MeshStandardMaterial({color:0xcbd3d5,metalness:.72,roughness:.22});
-    const group=new THREE.Group();
-    const body=new THREE.Mesh(new THREE.SphereGeometry(.8,18,12),fur);body.scale.set(.82,1.05,.72);body.position.y=1.25;group.add(body);
-    const head=new THREE.Mesh(new THREE.SphereGeometry(.62,18,12),fur);head.position.set(0,2.12,-.05);group.add(head);
-    for(const x of [-.33,.33]){const ear=new THREE.Mesh(new THREE.ConeGeometry(.26,.52,3),fur);ear.position.set(x,2.62,-.04);ear.rotation.z=x<0?.12:-.12;group.add(ear);}
-    for(const x of [-.22,.22]){const eye=new THREE.Mesh(new THREE.SphereGeometry(.055,9,7),dark);eye.position.set(x,2.23,-.58);group.add(eye);}
-    const nose=new THREE.Mesh(new THREE.SphereGeometry(.07,8,6),dark);nose.position.set(0,2.05,-.64);group.add(nose);
-    const pole=new THREE.Mesh(new THREE.CylinderGeometry(.06,.06,2.0,10),metal);pole.position.y=.15;group.add(pole);
-    const spring=new THREE.Mesh(new THREE.TorusGeometry(.22,.045,7,20),metal);spring.rotation.x=Math.PI/2;spring.scale.y=2.2;spring.position.y=-.78;group.add(spring);
-    const foot=new THREE.Mesh(new THREE.CylinderGeometry(.38,.3,.11,18),dark);foot.position.y=-1.05;foot.scale.z=.55;group.add(foot);
-    group.traverse(o=>{if(o.isMesh){o.castShadow=true;o.receiveShadow=true;}});
+    const model=this.models.get('neko_hopping_model');
+    if(!model)throw new Error('The ROM did not provide neko_hopping_model.');
+    const group=createModelInstance(model,this.assets,{shadows:true});
+    group.name='ROM neko_hopping_model';
     this.scene.add(group);this.playerMesh=group;
   }
 
@@ -97,25 +88,34 @@ export class HopperGame {
   resize(){const w=Math.max(1,this.host.clientWidth),h=Math.max(1,this.host.clientHeight);this.renderer.setSize(w,h,false);this.camera.aspect=w/h;this.camera.updateProjectionMatrix();}
 
   #clearStage(){
-    while(this.stageGroup.children.length){
-      const o=this.stageGroup.children[0];this.stageGroup.remove(o);
-      o.traverse?.(x=>{if(x.geometry)x.geometry.dispose();});
+    for(const o of [...this.stageGroup.children]){
+      this.stageGroup.remove(o);
+      disposeModelInstance(o);
     }
     this.platforms=[];
   }
 
   #makeFloor(record){
     const runtime=createFloorRuntime(record);const group=new THREE.Group();
-    const material=this.#materialFor(record.type);
-    const h=this.program.floorBuilder.collisionHalfHeight*2;
+    const modelName=record.type===3?'hopper_floor02_model':'hopper_floor01_model';
+    const model=this.models.get(modelName);
+    if(!model)throw new Error(`The ROM did not provide ${modelName}.`);
+    const scaleXZ=record.spacing*this.program.floorBuilder.tileModelScale;
+    const scaleY=this.program.floorBuilder.collisionHalfHeight;
     for(let row=0;row<record.rows;row++)for(let col=0;col<record.columns;col++){
       const x=gridCoordinate(record.columns,record.spacing,col),z=gridCoordinate(record.rows,record.spacing,row);
-      const tile=new THREE.Mesh(new THREE.BoxGeometry(record.spacing,h,record.spacing),material);
-      tile.position.set(x,-h/2,z);tile.castShadow=true;tile.receiveShadow=true;group.add(tile);
+      const tile=createModelInstance(model,this.assets,{shadows:true});
+      // Translation of 0x13C1F0..0x13C21C: the 10-unit floor mesh is
+      // scaled by spacing*0.1 on X/Z and 0.4 on Y.
+      tile.scale.set(scaleXZ,scaleY,scaleXZ);
+      tile.position.set(x,0,z);group.add(tile);
     }
     group.position.set(...runtime.center);this.stageGroup.add(group);
     runtime.group=group;
     if(record.type===3){
+      // Hopper's goal/effect CMDLs are emitter containers with no static
+      // triangle stream in this prototype. Keep the original ROM texture as
+      // the billboard until the emitter format is translated.
       const starAsset=this.assets.get('hopper_goal01')||this.assets.get('hopper_star01');
       const sprite=new THREE.Sprite(starAsset?new THREE.SpriteMaterial({map:makeTexture(starAsset),transparent:true,depthWrite:false}):new THREE.SpriteMaterial({color:0xffe35e}));
       sprite.scale.set(3.2,3.2,1);sprite.position.set(0,3.1,0);group.add(sprite);runtime.goalSprite=sprite;
@@ -220,9 +220,8 @@ export class HopperGame {
     const floor=this.#landingFloor(previous,current);if(floor)this.#land(floor);
     if(this.player.pos.y<this.program.physics.failY)this.#fall();
     this.callbacks.onTime?.(this.elapsedFrames/this.program.physics.fixedHz);
-    this.playerMesh.position.copy(this.player.pos);this.playerMesh.position.y+=1.05;
-    this.playerMesh.rotation.z=THREE.MathUtils.lerp(this.playerMesh.rotation.z,-input.x*.15,.18);
-    this.playerMesh.rotation.x=THREE.MathUtils.lerp(this.playerMesh.rotation.x,input.z*.1,.18);
+    // The original CMDL root is authored at the pogo contact point.
+    this.playerMesh.position.copy(this.player.pos);
   }
 
   #win(){
