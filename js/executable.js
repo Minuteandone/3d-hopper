@@ -192,7 +192,6 @@ export function liftHopperProgram(romOrBuffer){
     movementRadius:exe.readF32(0x151b90),
     spawnClearance:exe.readF32(0x151f3c),
     failY:exe.readF32(0x13cccc),
-    fixedHz:60,
   };
   const floorBuilder={
     recordStride:48,
@@ -209,7 +208,7 @@ export function liftHopperProgram(romOrBuffer){
       title:exe.meta.title,sceneName:exe.readString(sceneNamePtr),sceneNamePtr,factoryAddress:factory,
       routines:{
         floorBuilder:0x13c034,gameplayUpdate:0x13c81c,stageConstruction:0x13f550,
-        playerReset:0x1517dc,stageGlobalInitializer:STAGE_GLOBAL_INITIALIZER,movingFloorUpdate:0x13dd58,
+        stateSetup:0x1517dc,stageGlobalInitializer:STAGE_GLOBAL_INITIALIZER,movingFloorUpdate:0x13dd58,
       },
     },
     stages,physics,floorBuilder,
