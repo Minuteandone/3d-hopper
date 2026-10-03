@@ -60,3 +60,24 @@ export function noteFall(program,state){
 
 export function findStartRecord(records){return records.find(r=>r.type===2)??records[0];}
 export function findGoalRecord(records){return records.find(r=>r.type===3)??records.at(-1);}
+
+/**
+ * Translation of the horizontal-velocity branch at 0x13D4A8..0x13D57C.
+ * floorHitThisUpdate is the collision index test (r10 >= 0), not a persistent
+ * grounded state.
+ */
+export function updateHorizontalVelocity(velocity,input,floorHitThisUpdate,physics){
+  const next={x:velocity.x,z:velocity.z};
+  if(floorHitThisUpdate){
+    const tx=input.x*physics.floorHitInputScale;
+    const tz=input.z*physics.floorHitInputScale;
+    if(Math.abs(next.x)<Math.abs(tx))next.x=tx;
+    if(Math.abs(next.z)<Math.abs(tz))next.z=tz;
+  }else{
+    const tx=input.x*physics.inputScale;
+    const tz=input.z*physics.inputScale;
+    next.x+=(tx-next.x)*physics.airVelocityLerp;
+    next.z+=(tz-next.z)*physics.airVelocityLerp;
+  }
+  return next;
+}
