@@ -205,7 +205,7 @@ export class HopperGame {
 
   #land(floor){
     const p=this.program.physics;this.player.pos.y=floor.center[1];
-    this.player.vel.y=floor.velocity[1]+p.landingBouncePerFrame;
+    this.player.vel.y=floor.velocity[1]+p.landingBouncePerUpdate;
     this.player.pos.x+=floor.velocity[0];this.player.pos.z+=floor.velocity[2];
     this.player.grounded=true;this.state.currentFloorIndex=floor.index;
     if(floor.record.type===3){
@@ -234,7 +234,7 @@ export class HopperGame {
 
     // 0x13CAD4..0x13CB40: state 2 advances to the next descriptor stage as
     // the upward velocity reaches its apex window.
-    if(this.phase===2&&this.player.vel.y>=0&&this.player.vel.y-this.program.physics.gravityPerFrame<0){
+    if(this.phase===2&&this.player.vel.y>=0&&this.player.vel.y-this.program.physics.gravityPerUpdate<0){
       const next=this.state.stageIndex+1;
       this.#buildStage(next,false);
       this.callbacks.onAdvance?.(next+1);
@@ -244,9 +244,9 @@ export class HopperGame {
     const input=this.#inputVector();this.#steer(input);
     this.player.grounded=false;
     const state2=this.phase===2;
-    this.player.vel.y-=state2?this.program.physics.specialGravityPerFrame:this.program.physics.gravityPerFrame;
+    this.player.vel.y-=state2?this.program.physics.state2GravityPerUpdate:this.program.physics.gravityPerUpdate;
     const previous=this.player.pos.clone();
-    const displacement=this.player.vel.clone().multiplyScalar(state2?.5:1);
+    const displacement=this.player.vel.clone().multiplyScalar(state2?this.program.physics.state2DisplacementScale:1);
     const current=this.player.pos.clone().add(displacement);
     this.player.pos.copy(current);
     const floor=this.#landingFloor(previous,current);if(floor)this.#land(floor);
