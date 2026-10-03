@@ -27,9 +27,10 @@ export function decodeBcstm(input) {
   }
 
   const info = sections.get(0x4000);
+  const seek = sections.get(0x4001);
   const data = sections.get(0x4002);
-  if (!info || !data) throw new Error('BCSTM is missing INFO or DATA.');
-  if (fourcc(bytes, info.offset) !== 'INFO' || fourcc(bytes, data.offset) !== 'DATA') {
+  if (!info || !seek || !data) throw new Error('BCSTM is missing INFO, SEEK, or DATA.');
+  if (fourcc(bytes, info.offset) !== 'INFO' || fourcc(bytes, seek.offset) !== 'SEEK' || fourcc(bytes, data.offset) !== 'DATA') {
     throw new Error('BCSTM section signatures do not match the header.');
   }
 
@@ -52,16 +53,17 @@ export function decodeBcstm(input) {
   const lastBlockSize = u32(p); p += 4;
   const lastBlockSamples = u32(p); p += 4;
   const lastBlockPaddedSize = u32(p); p += 4;
-  p += 8; // seek entry size + seek interval
+  const seekEntrySize = u32(p); p += 4;
+  const seekInterval = u32(p); p += 4;
   p += 4; // data reference signature
   const dataRelativeOffset = u32(p);
+  if (seekEntrySize < 4) throw new Error('BCSTM SEEK entries are too small.');
 
   const channelTable = infoBase + u32(info.offset + 28);
   const listedChannels = u32(channelTable);
   if (listedChannels !== channelCount) throw new Error('BCSTM channel table disagrees with stream metadata.');
 
   const coefficients = [];
-  const history = [];
   for (let c = 0; c < channelCount; c++) {
     const ref = channelTable + 4 + c * 8;
     const channelInfo = channelTable + u32(ref + 4);
@@ -70,7 +72,6 @@ export function decodeBcstm(input) {
     const coefs = new Int16Array(16);
     for (let i = 0; i < 16; i++) coefs[i] = s16(codecInfo + i * 2);
     coefficients.push(coefs);
-    history.push([s16(codecInfo + 34), s16(codecInfo + 36)]);
   }
 
   const totalSamples = blockCount ? (blockCount - 1) * blockSamples + lastBlockSamples : 0;
@@ -88,7 +89,9 @@ export function decodeBcstm(input) {
     for (let c = 0; c < channelCount; c++) {
       let cursor = blockBase + c * stride;
       const end = cursor + encodedBytes;
-      let [hist1, hist2] = history[c];
+      const seekEntry = seek.offset + 8 + (block * channelCount + c) * seekEntrySize;
+      if (seekEntry + 4 > seek.offset + seek.size) throw new Error('BCSTM SEEK table is truncated.');
+      let hist1 = s16(seekEntry), hist2 = s16(seekEntry + 2);
       let made = 0;
       const out = channels[c];
       const coefs = coefficients[c];
@@ -117,11 +120,10 @@ export function decodeBcstm(input) {
           }
         }
       }
-      history[c] = [hist1, hist2];
     }
   }
 
-  return { sampleRate, loop, loopStart, loopEnd, channels, sampleCount: totalSamples };
+  return { sampleRate, loop, loopStart, loopEnd, channels, sampleCount: totalSamples, seekInterval };
 }
 
 function toAudioBuffer(context, decoded) {
