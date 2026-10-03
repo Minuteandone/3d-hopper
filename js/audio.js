@@ -107,10 +107,10 @@ export function decodeBcstm(input) {
           for (let half = 0; half < 2 && made < samplesWanted; half++) {
             let nibble = half === 0 ? packed >>> 4 : packed & 0x0f;
             if (nibble >= 8) nibble -= 16;
-            // This prototype's DSP path truncates rather than adding a rounding bias.
-            // Math.floor matches an arithmetic right-shift for negative values too.
+            // Nintendo DSP-ADPCM rounds with +0x400 before the arithmetic >> 11.
+            // Math.floor((x + 0x400) / 2048) matches that shift for negatives too.
             const corrected = coef1 * hist1 + coef2 * hist2 + scale * nibble;
-            const sample = clamp16(Math.floor(corrected / 2048));
+            const sample = clamp16(Math.floor((corrected + 0x400) / 2048));
             out[outBase + made++] = sample;
             hist2 = hist1;
             hist1 = sample;
