@@ -86,10 +86,24 @@ Validated model facts from this build:
 - Material TXOB references recover the original `hopping`, `nekopper`, and floor textures.
 - Every decoded index stream is bounds-checked against its corresponding real vertex buffer.
 
-The cat file also contains `neko_hopping_jump`, a 48-frame CANM skeletal animation. Its 2010 TransformAnimation member layout predates the later layout handled by common CGFX tooling, so the port deliberately does not fake that clip; the decoded 24-bone skeleton currently renders in bind pose.
+The cat file also contains `neko_hopping_jump`, a 48-frame CANM skeletal animation. The port now decodes its early transform-member flags plus 59 Hermite128 curves across 18 bone tracks and applies them to the decoded 24-bone skeleton. The remaining uncertainty is the exact generic NintendoWare controller cadence; the browser currently treats the non-looping clip as a one-shot pogo animation.
 
-Several effect CMDLs, including the goal/star/opening resources, contain emitter/model shells but no static vertex/index stream. Their original ROM textures are currently rendered as billboards until that early emitter format is translated.
+The effect resource contains **16 `PEMT` emitter objects**. Their exact binary boundaries are now parsed by emitter kind: kind 8 = `0xDC` bytes, kind 1 = `0xF0`, kind 4 = `0xF8`. This matters because dictionary order is not physical order (for example, `goal05` lives much earlier in the file).
+
+The ARM constructor's 16-slot registry is also translated:
+
+- slot 0 opening
+- slot 1 stamp (3 instances)
+- slots 2-3 star01/star02
+- slot 4 headpat (3 instances)
+- slots 5-9 starshower00..04
+- slots 10-14 goal01..05
+- slot 15 floor effect
+
+Recovered activation rules include landing stamp = slot 1, stage shower = `6 + stageIndex`, normal goal pair = slots 10/11, Stage 4 goal pair = 12/13, floor effect = slot 15 when the floor flag is set, and ending starshower00 beginning at original ending frame 240.
+
+The browser now uses those original resources/slot choices, but particle trajectories are still a clearly separated Three.js approximation until the full early NintendoWare PEMT runtime is translated.
 
 ## Current fidelity boundary
 
-The web port now combines **translated original game routines/data** with **original BCMDL geometry, skeletons, textures, and BCSTM audio**. It still does not execute Nintendo's original graphics engine or ARM CPU directly. Three.js supplies the host renderer, PICA200 material behavior is approximated, collision is a browser translation of the recovered floor extents, CANM TransformAnimation remains to be decoded, and camera/stereo presentation remains browser-side.
+The web port now combines **translated original game routines/data** with **original BCMDL geometry, skeletons, textures, and BCSTM audio**. It still does not execute Nintendo's original graphics engine or ARM CPU directly. Three.js supplies the host renderer, PICA200 material behavior is approximated, collision is a browser translation of the recovered floor extents, PEMT particle integration and the exact generic CANM controller cadence remain to be decoded, and camera/stereo presentation remains browser-side.
