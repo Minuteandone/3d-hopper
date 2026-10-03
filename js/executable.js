@@ -186,10 +186,10 @@ export function liftHopperProgram(romOrBuffer){
   applyStageGlobalConstructor(exe,stages,startupFloor);
 
   const physics={
-    gravityPerFrame:exe.readF32(0x13cce4),
-    specialGravityPerFrame:exe.readF32(0x13ccf8),
-    specialPredictionScale:exe.readF32(0x13ccf4),
-    landingBouncePerFrame:exe.readF32(0x13d328),
+    gravityPerUpdate:exe.readF32(0x13cce4),
+    state2GravityPerUpdate:exe.readF32(0x13ccf8),
+    state2DisplacementScale:exe.readF32(0x13ccf4),
+    landingBouncePerUpdate:exe.readF32(0x13d328),
     inputScale:exe.readF32(0x13d7bc),
     groundedInputScale:exe.readF32(0x13d7c0),
     airVelocityLerp:exe.readF32(0x13d7c4),
