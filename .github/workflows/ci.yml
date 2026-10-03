@@ -19,6 +19,8 @@ jobs:
       - name: Check JavaScript syntax
         run: |
           node --check js/rom.js
+          node --check js/executable.js
+          node --check js/runtime.js
           node --check js/cgfx.js
           node --check js/models.js
           node --check js/model-renderer.js
@@ -28,9 +30,14 @@ jobs:
           node --check js/effect-renderer.js
           node --check js/prototype-code.js
           node --check js/audio.js
+          node --check js/bcsar.js
           node --check js/game.js
           node --check js/main.js
           node --check tests/rom-test.mjs
           node --check tests/animation-test.mjs
           node --check tests/emitters-test.mjs
           node --check tests/effects-test.mjs
+
+          node --check tests/code-lift-test.mjs
+          node --check tests/runtime-test.mjs
+          node --check tests/bcsar-test.mjs
