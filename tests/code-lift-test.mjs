@@ -1,6 +1,6 @@
 import fs from 'node:fs';
 import { HopperRom } from '../js/rom.js';
-import { liftHopperProgram, gridCoordinate, movingFloorAt } from '../js/executable.js';
+import { liftHopperProgram, gridCoordinate, movingFloorAt, transformControlVector } from '../js/executable.js';
 
 const path=process.argv[2];
 if(!path)throw new Error('usage: node tests/code-lift-test.mjs /path/to/3D_Hopper.app');
@@ -26,5 +26,12 @@ const mover=p.stages[3].records[1];
 const quarter=movingFloorAt(mover,179);
 if(!close(quarter.position[0],0)||!close(quarter.position[2],-8))throw new Error(`moving-floor sine mismatch: ${quarter.position}`);
 if(p.initialState.stage2ExtraCounter!==2)throw new Error('game constructor state mismatch');
+if(!close(p.controls.degreesToTrigUnits,.7111111283))throw new Error('control degree conversion mismatch');
+eq(p.controls.stageSetup.map(s=>s.orientation),[[65,-40,0],[60,-20,0],[60,-50,25],[65,-40,0]],'stage orientation setup');
+const right3=transformControlVector(p.controls,2,1,0);
+if(!close(right3.x,.9062611285,1e-6)||!close(right3.z,-.4225963562,1e-6))throw new Error(`stage 3 control rotation mismatch: ${JSON.stringify(right3)}`);
+const forward3=transformControlVector(p.controls,2,0,1);
+if(!close(forward3.x,.4225963562,1e-6)||!close(forward3.z,.9062611285,1e-6))throw new Error(`stage 3 forward rotation mismatch: ${JSON.stringify(forward3)}`);
+
 console.log(JSON.stringify({scene:p.build.sceneName,startupFloor:p.startupFloor,stageCounts:p.stages.map(s=>s.count),stage3:p.stages[3],physics:p.physics},null,2));
 console.log('ARM data/code lift OK');
