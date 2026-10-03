@@ -1,7 +1,7 @@
 import fs from 'node:fs';
 import { HopperRom } from '../js/rom.js';
 import { liftHopperProgram } from '../js/executable.js';
-import { createGameState,activeStageRecords,createFloorRuntime,tickFloorRuntime,noteFall } from '../js/runtime.js';
+import { createGameState,activeStageRecords,createFloorRuntime,tickFloorRuntime,noteFall,updateHorizontalVelocity } from '../js/runtime.js';
 
 const path=process.argv[2]; if(!path)throw new Error('usage: node tests/runtime-test.mjs ROM');
 const b=fs.readFileSync(path),ab=b.buffer.slice(b.byteOffset,b.byteOffset+b.byteLength);const p=liftHopperProgram(new HopperRom(ab));
@@ -12,4 +12,10 @@ noteFall(p,s); if(s.stage2ExtraCounter!==0||activeStageRecords(p,s).length!==4)t
 const mover=createFloorRuntime(p.stages[3].records[1]);
 if(JSON.stringify(mover.center)!==JSON.stringify([0,0,-8]))throw new Error(`floor-builder initial center mismatch ${mover.center}`);
 tickFloorRuntime(mover); if(mover.timer!==1)throw new Error('moving floor timer mismatch');
+
+const floorHit=updateHorizontalVelocity({x:.1,z:-.3},{x:1,z:.5},true,p.physics);
+if(Math.abs(floorHit.x-.25)>1e-6||Math.abs(floorHit.z-(-.3))>1e-6)throw new Error(`floor-hit steering mismatch ${JSON.stringify(floorHit)}`);
+const airborne=updateHorizontalVelocity({x:.1,z:-.3},{x:1,z:.5},false,p.physics);
+if(Math.abs(airborne.x-.1015)>1e-6||Math.abs(airborne.z-(-.28875))>1e-6)throw new Error(`air steering mismatch ${JSON.stringify(airborne)}`);
+
 console.log('Translated stage runtime OK', {rescueCounter:s.stage2ExtraCounter,moverCenter:mover.center,moverVelocity:mover.velocity});
