@@ -4,6 +4,7 @@
   "type": "module",
   "scripts": {
     "test:rom": "node tests/rom-test.mjs",
-    "test:code": "node tests/code-lift-test.mjs"
+    "test:code": "node tests/code-lift-test.mjs",
+    "test:runtime": "node tests/runtime-test.mjs"
   }
 }
