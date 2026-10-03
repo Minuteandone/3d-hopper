@@ -1,4 +1,5 @@
 import fs from 'node:fs';
+import { createHash } from 'node:crypto';
 import { HopperRom } from '../js/rom.js';
 import { parseTextures, decodeTexture, textureMapFromRom } from '../js/cgfx.js';
 import { decodeBcstm } from '../js/audio.js';
@@ -41,9 +42,16 @@ for(const modelPath of ['gfx/hopper_cat.bcmdl','gfx/hopper_map_floor01.bcmdl','g
   }
 }
 
+const pcmHash=channel=>{
+  const bytes=Buffer.allocUnsafe(channel.length*2);
+  for(let i=0;i<channel.length;i++)bytes.writeInt16LE(channel[i],i*2);
+  return createHash('sha256').update(bytes).digest('hex');
+};
 const bgm=decodeBcstm(rom.get('sound/stream/DUMMY_LOOPED.bcstm'));
-if(bgm.sampleRate!==32000||bgm.channels.length!==2||bgm.sampleCount!==245760||!bgm.loop) throw new Error('unexpected looping BCSTM metadata');
+if(bgm.sampleRate!==32000||bgm.channels.length!==2||bgm.sampleCount!==245760||!bgm.loop||bgm.seekInterval!==14336) throw new Error('unexpected looping BCSTM metadata');
+if(pcmHash(bgm.channels[0])!=='364e599b154e5f930f7ace4879c6bfe978e90967e3dbc1d948d3e4bfbe67ff3a'||pcmHash(bgm.channels[1])!=='6f03896aeb84f3d0df18e38500cef052327a5acccbffd443c3296704c2c6e522')throw new Error('looping BCSTM PCM does not match SEEK-aware DSP decode');
 const congrats=decodeBcstm(rom.get('sound/stream/HOPPER_BGM_CONGRATS.bcstm'));
-if(congrats.sampleRate!==32000||congrats.channels.length!==2||congrats.sampleCount!==465610||congrats.loop) throw new Error('unexpected congratulations BCSTM metadata');
+if(congrats.sampleRate!==32000||congrats.channels.length!==2||congrats.sampleCount!==465610||congrats.loop||congrats.seekInterval!==14336) throw new Error('unexpected congratulations BCSTM metadata');
+if(pcmHash(congrats.channels[0])!=='fd0a9d1a093a2bccd5d1b89f6b9cc7ec8af2cc2564c582a1fec737a242f5307e'||pcmHash(congrats.channels[1])!=='a2e990aeecef8e28bf85c4decb18574f8d78427c545d94405acc97d4271c68fe')throw new Error('congratulations BCSTM PCM does not match SEEK-aware DSP decode');
 
 console.log('ROM + textures + actual BCMDL models/skeletons + BCSTM audio OK');
