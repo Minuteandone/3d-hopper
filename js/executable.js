@@ -13,6 +13,8 @@ function zstr(bytes,o,max=0x400){
 const GAME_DESCRIPTOR_VA=0x191120;
 const STAGE_GLOBAL_INITIALIZER=0x16b424;
 const STARTUP_FLOOR_RECORD_VA=0x19e0c8;
+const CONTROL_DEGREES_SCALE_VA=0x1517d8;
+const PROTOTYPE_TRIG_TABLE_VA=0x1949c8;
 const EXPECTED_SIGNATURES={
   0x13c034:0xe92d4ff0,
   0x13c81c:0xe92d4ff0,
@@ -151,6 +153,34 @@ function applyStageGlobalConstructor(exe,stages,startupFloor){
   return stages;
 }
 
+function readPrototypeTrigTable(exe){
+  const table=new Float32Array(256*4);
+  for(let i=0;i<table.length;i++)table[i]=exe.readF32(PROTOTYPE_TRIG_TABLE_VA+i*4);
+  return table;
+}
+
+/**
+ * Translation of 0x15BD0C for the angle range used by Hopper controls.
+ * The ROM table stores [sin, cos, sinSlope, cosSlope] for 256 steps/turn.
+ */
+export function prototypeSinCos(table,angleUnits){
+  let x=Math.abs(angleUnits);
+  while(x>=65536)x-=65536;
+  const whole=Math.floor(x),fraction=x-whole,index=(whole&255)*4;
+  let sin=table[index]+fraction*table[index+2];
+  const cos=table[index+1]+fraction*table[index+3];
+  if(angleUnits<0)sin=-sin;
+  return {sin,cos};
+}
+
+/** Translation of control-space helper 0x1516CC with Y=0. */
+export function transformControlVector(controls,stageIndex,x,z){
+  const heading=controls.stageSetup[stageIndex]?.controlHeadingDegrees??0;
+  const units=heading*controls.degreesToTrigUnits;
+  const {sin,cos}=prototypeSinCos(controls.trigTable,units);
+  return {x:cos*x+sin*z,z:-sin*x+cos*z};
+}
+
 export function gridCoordinate(count,spacing,index){
   return 0.5*(1-count)*spacing+index*spacing;
 }
@@ -185,6 +215,22 @@ export function liftHopperProgram(romOrBuffer){
   const startupFloor=readFloorRecord(exe,STARTUP_FLOOR_RECORD_VA,-1);
   applyStageGlobalConstructor(exe,stages,startupFloor);
 
+  const trigTable=readPrototypeTrigTable(exe);
+  const controls={
+    degreesToTrigUnits:exe.readF32(CONTROL_DEGREES_SCALE_VA),
+    trigTable,
+    // 0x1517DC writes these orientation triples into game+4. 0x1516CC
+    // consumes only the third component when rotating analog input.
+    stageSetup:[
+      {orientation:[exe.readF32(0x151b70),exe.readF32(0x151b74),exe.readF32(0x151b7c)]},
+      {orientation:[exe.readF32(0x151b88),exe.readF32(0x151f2c),exe.readF32(0x151b7c)]},
+      {orientation:[exe.readF32(0x151b88),exe.readF32(0x151f34),exe.readF32(0x151f38)]},
+      {orientation:[exe.readF32(0x151b70),exe.readF32(0x151b74),exe.readF32(0x151b7c)]},
+    ],
+    sourceAddress:0x1516cc,
+  };
+  for(const stage of controls.stageSetup)stage.controlHeadingDegrees=stage.orientation[2];
+
   const physics={
     gravityPerUpdate:exe.readF32(0x13cce4),
     state2GravityPerUpdate:exe.readF32(0x13ccf8),
@@ -217,7 +263,7 @@ export function liftHopperProgram(romOrBuffer){
         stateSetup:0x1517dc,stageGlobalInitializer:STAGE_GLOBAL_INITIALIZER,startupSetup:0x13f8c0,movingFloorUpdate:0x13dd58,
       },
     },
-    stages,startupFloor,physics,floorBuilder,
+    stages,startupFloor,controls,physics,floorBuilder,
     initialState:{stageIndex:0,stage2ExtraCounter:2},
     executable:exe,
   };
