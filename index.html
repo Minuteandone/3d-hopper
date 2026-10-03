@@ -1,0 +1,89 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
+  <meta name="theme-color" content="#13212f" />
+  <title>3D Hopper — Web Port</title>
+  <link rel="stylesheet" href="./style.css" />
+</head>
+<body>
+  <main class="shell">
+    <header class="topbar">
+      <div>
+        <h1>3D Hopper <span>web port</span></h1>
+        <p>Clean-room browser reimplementation · original assets loaded from your ROM</p>
+      </div>
+      <label class="rom-button">
+        <input id="romInput" type="file" accept=".app,.cxi,application/octet-stream" />
+        <span>Choose 3D_Hopper.app</span>
+      </label>
+    </header>
+
+    <section class="screen-frame" aria-label="3D Hopper game viewport">
+      <div id="viewport"></div>
+      <div id="boot" class="boot overlay">
+        <div class="boot-card">
+          <div class="pogo-icon" aria-hidden="true">🐱<span></span></div>
+          <h2>Load your original build</h2>
+          <p>The ROM stays on this device. The site reads the prototype ROFS and decodes the game's CGFX textures locally.</p>
+          <label class="rom-button big">
+            <input id="romInputBig" type="file" accept=".app,.cxi,application/octet-stream" />
+            <span>Open 3D_Hopper.app</span>
+          </label>
+          <small>No Nintendo assets are hosted with this site.</small>
+        </div>
+      </div>
+
+      <div id="titleScreen" class="title-screen overlay hidden" aria-live="polite">
+        <canvas id="titleArt"></canvas>
+        <canvas id="pressArt"></canvas>
+        <button id="startButton">Start</button>
+      </div>
+
+      <div id="hud" class="hud hidden">
+        <div><b>STAGE</b> <span id="stageNo">1</span></div>
+        <div><b>TIME</b> <span id="time">0.0</span></div>
+        <div><b>FALLS</b> <span id="falls">0</span></div>
+      </div>
+
+      <div id="finish" class="finish overlay hidden">
+        <canvas id="congratsArt"></canvas>
+        <p id="finishStats"></p>
+        <div class="finish-actions">
+          <button id="againButton">Play again</button>
+          <button id="thanksButton">Thank-you screen</button>
+        </div>
+      </div>
+
+      <div id="thanks" class="thanks overlay hidden">
+        <canvas id="thanksArt"></canvas>
+        <button id="backButton">Back</button>
+      </div>
+
+      <div id="error" class="error hidden" role="alert"></div>
+
+      <div id="touchControls" class="touch-controls hidden" aria-label="Touch controls">
+        <button data-key="left" aria-label="Move left">◀</button>
+        <button data-key="up" aria-label="Move forward">▲</button>
+        <button data-key="down" aria-label="Move backward">▼</button>
+        <button data-key="right" aria-label="Move right">▶</button>
+      </div>
+    </section>
+
+    <section class="controls">
+      <div><b>Move:</b> WASD / arrow keys / touch / gamepad stick</div>
+      <div><b>Bounce:</b> automatic — this is a pogo cat, rules are rules 🐱</div>
+      <label class="depth-control"><span>Depth</span><input id="depth" type="range" min="0" max="100" value="55" /></label>
+      <div id="romStatus" class="rom-status">Waiting for ROM…</div>
+    </section>
+
+    <details class="about">
+      <summary>What is this?</summary>
+      <p>This is a clean-room playable reimplementation of the E3 2010 <em>Tech Demo: 3D Hopper</em>. It does not emulate the original ARM executable. Instead, it reads the original prototype's asset filesystem in your browser and uses those decoded textures in a new Three.js game implementation.</p>
+    </details>
+  </main>
+
+  <script type="module" src="./js/main.js"></script>
+</body>
+</html>
