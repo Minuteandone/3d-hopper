@@ -1,6 +1,7 @@
 import * as THREE from 'https://cdn.jsdelivr.net/npm/three@0.186.1/build/three.module.js';
-import { canvasFromTexture } from './cgfx.js';
 import { createModelInstance, disposeModelInstance, applySkeletalAnimation } from './model-renderer.js';
+import { HopperEffectHost } from './effect-renderer.js';
+import { LANDING_STAMP_SLOT,AIRBORNE_STAR_SLOT,FLOOR_EFFECT_SLOT,goalEffectSlots } from './effects.js';
 import { gridCoordinate } from './executable.js';
 import {
   createGameState,activeStageRecords,createFloorRuntime,tickFloorRuntime,noteFall,findStartRecord,
@@ -8,24 +9,16 @@ import {
 
 const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
 
-function makeTexture(asset) {
-  const canvas=canvasFromTexture(asset);
-  const tex=new THREE.CanvasTexture(canvas);
-  tex.colorSpace=THREE.SRGBColorSpace;
-  tex.wrapS=THREE.ClampToEdgeWrapping;tex.wrapT=THREE.ClampToEdgeWrapping;
-  tex.magFilter=THREE.NearestFilter;tex.minFilter=THREE.LinearMipmapLinearFilter;
-  return tex;
-}
-
 export class HopperGame {
-  constructor(host,assets,models,animations,program,callbacks={}) {
-    this.host=host;this.assets=assets;this.models=models;this.animations=animations;this.program=program;this.callbacks=callbacks;
+  constructor(host,assets,models,animations,effectRegistry,program,callbacks={}) {
+    this.host=host;this.assets=assets;this.models=models;this.animations=animations;this.effectRegistry=effectRegistry;this.program=program;this.callbacks=callbacks;
     this.renderer=new THREE.WebGLRenderer({antialias:true,alpha:false,powerPreference:'high-performance'});
     this.renderer.setPixelRatio(Math.min(devicePixelRatio,2));
     this.renderer.shadowMap.enabled=true;this.renderer.shadowMap.type=THREE.PCFSoftShadowMap;
     this.renderer.outputColorSpace=THREE.SRGBColorSpace;this.host.appendChild(this.renderer.domElement);
 
     this.scene=new THREE.Scene();this.scene.background=new THREE.Color(0x9bdcf3);this.scene.fog=new THREE.Fog(0xb4e6f4,35,95);
+    this.effectHost=new HopperEffectHost(this.scene,this.assets,this.effectRegistry);
     this.camera=new THREE.PerspectiveCamera(47,5/3,.1,160);
     this.clock=new THREE.Clock();this.accumulator=0;
     this.fixedStep=1/this.program.physics.fixedHz;
@@ -34,7 +27,7 @@ export class HopperGame {
     this.state=createGameState(program);
     this.player={pos:new THREE.Vector3(),vel:new THREE.Vector3(),grounded:false};
     this.playerAnimation=null;this.playerAnimFrame=0;this.playerAnimActive=false;
-    this.platforms=[];this.particles=[];this.stageGroup=new THREE.Group();this.scene.add(this.stageGroup);
+    this.platforms=[];this.stageGroup=new THREE.Group();this.scene.add(this.stageGroup);
 
     this.#lights();this.#makeSky();this.#makePlayer();this.#events();
     this.resize();new ResizeObserver(()=>this.resize()).observe(host);
@@ -109,21 +102,13 @@ export class HopperGame {
     }
     group.position.set(...runtime.center);this.stageGroup.add(group);
     runtime.group=group;
-    if(record.type===3){
-      // Hopper's goal/effect CMDLs are emitter containers with no static
-      // triangle stream in this prototype. Keep the original ROM texture as
-      // the billboard until the emitter format is translated.
-      const starAsset=this.assets.get('hopper_goal01')||this.assets.get('hopper_star01');
-      const sprite=new THREE.Sprite(starAsset?new THREE.SpriteMaterial({map:makeTexture(starAsset),transparent:true,depthWrite:false}):new THREE.SpriteMaterial({color:0xffe35e}));
-      sprite.scale.set(3.2,3.2,1);sprite.position.set(0,3.1,0);group.add(sprite);runtime.goalSprite=sprite;
-    }
     return runtime;
   }
 
   #buildStage(index,newCampaign=false,preserveElapsed=false){
     const previousElapsed=this.elapsedFrames;
     if(newCampaign)this.state=createGameState(this.program);
-    this.state.stageIndex=index;this.#clearStage();
+    this.state.stageIndex=index;this.effectHost.clear();this.#clearStage();
     const records=activeStageRecords(this.program,this.state,index);
     this.platforms=records.map(r=>this.#makeFloor(r));
     const start=findStartRecord(records);this.state.currentFloorIndex=start.index;
@@ -163,7 +148,6 @@ export class HopperGame {
     for(const floor of this.platforms){
       tickFloorRuntime(floor);
       floor.group.position.set(...floor.center);
-      if(floor.goalSprite)floor.goalSprite.material.rotation=(floor.goalSprite.material.rotation||0)+.025;
     }
   }
 
@@ -197,6 +181,9 @@ export class HopperGame {
     this.player.vel.y=floor.velocity[1]+p.landingBouncePerFrame;
     this.player.pos.x+=floor.velocity[0];this.player.pos.z+=floor.velocity[2];
     this.player.grounded=true;this.state.currentFloorIndex=floor.index;
+    const effectPos=new THREE.Vector3(this.player.pos.x,floor.center[1]+.15,this.player.pos.z);
+    this.effectHost.spawnSlot(LANDING_STAMP_SLOT,effectPos);
+    if(floor.record.flag)this.effectHost.spawnSlot(FLOOR_EFFECT_SLOT,new THREE.Vector3(...floor.center));
     this.playerAnimFrame=0;this.playerAnimActive=true;
     applySkeletalAnimation(this.playerMesh,this.playerAnimation,0,{loop:false});
     if(floor.record.type===3)this.#win();
@@ -224,10 +211,12 @@ export class HopperGame {
     this.#readGamepad();this.#updateFloors();
     const input=this.#inputVector();this.#steer(input);
     this.player.grounded=false;
+    const previousVy=this.player.vel.y;
     this.player.vel.y-=this.program.physics.gravityPerFrame;
     const previous=this.player.pos.clone(),current=this.player.pos.clone().add(this.player.vel);
     this.player.pos.copy(current);
     const floor=this.#landingFloor(previous,current);if(floor)this.#land(floor);
+    else if(previousVy>0&&this.player.vel.y<=0)this.effectHost.spawnSlot(AIRBORNE_STAR_SLOT,this.player.pos.clone().add(new THREE.Vector3(0,1.2,0)));
     if(this.player.pos.y<this.program.physics.failY)this.#fall();
     this.callbacks.onTime?.(this.elapsedFrames/this.program.physics.fixedHz);
     this.#updatePlayerAnimation();
@@ -236,22 +225,11 @@ export class HopperGame {
   }
 
   #win(){
-    if(!this.playing)return;this.playing=false;this.#burst();
+    if(!this.playing)return;this.playing=false;
+    const effectPos=this.player.pos.clone().add(new THREE.Vector3(0,1,0));
+    for(const slot of goalEffectSlots(this.state.stageIndex))this.effectHost.spawnSlot(slot,effectPos);
     const final=this.state.stageIndex===this.program.stages.length-1;
     this.callbacks.onWin?.({stage:this.state.stageIndex+1,stageIndex:this.state.stageIndex,time:this.elapsedFrames/this.program.physics.fixedHz,falls:this.state.falls,final,rescueCounter:this.state.stage2ExtraCounter});
-  }
-
-  #burst(){
-    const asset=this.assets.get('hopper_star01')||this.assets.get('hopper_spark01');const map=asset?makeTexture(asset):null;
-    for(let i=0;i<26;i++){
-      const s=new THREE.Sprite(new THREE.SpriteMaterial({map,color:0xffe86c,transparent:true,depthWrite:false}));s.scale.setScalar(.6+Math.random()*.8);s.position.copy(this.player.pos).add(new THREE.Vector3(0,1.4,0));this.scene.add(s);
-      this.particles.push({mesh:s,life:1.2,vel:new THREE.Vector3((Math.random()-.5)*.28,Math.random()*.25+.08,(Math.random()-.5)*.28)});
-    }
-  }
-
-  #updateParticles(dt){
-    const frames=dt*this.program.physics.fixedHz;
-    for(let i=this.particles.length-1;i>=0;i--){const p=this.particles[i];p.life-=dt;p.vel.y-=.012*frames;p.mesh.position.addScaledVector(p.vel,frames);p.mesh.material.opacity=Math.max(0,p.life);if(p.life<=0){this.scene.remove(p.mesh);p.mesh.material.dispose();this.particles.splice(i,1);}}
   }
 
   #camera(snap=false){
@@ -267,6 +245,6 @@ export class HopperGame {
       this.accumulator=Math.min(this.accumulator+dt,.25);
       while(this.accumulator>=this.fixedStep){this.#fixedTick();this.accumulator-=this.fixedStep;}
     }
-    this.#updateParticles(dt);this.#camera(false);this.renderer.render(this.scene,this.camera);
+    this.effectHost.update(dt);this.#camera(false);this.renderer.render(this.scene,this.camera);
   }
 }
