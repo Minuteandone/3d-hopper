@@ -1,0 +1,8 @@
+# Never commit original game data or extracted Nintendo assets.
+*.app
+*.cxi
+*.3ds
+rom/
+extracted/
+textures/
+.DS_Store
