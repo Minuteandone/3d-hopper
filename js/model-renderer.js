@@ -1,6 +1,7 @@
 import * as THREE from 'https://cdn.jsdelivr.net/npm/three@0.186.1/build/three.module.js';
 import { canvasFromTexture } from './cgfx.js';
 import { VertexUsage } from './models.js';
+import { sampleTransformTrack } from './animation.js';
 
 function matrix4From34(m){const out=new THREE.Matrix4();out.set(m[0],m[1],m[2],m[3],m[4],m[5],m[6],m[7],m[8],m[9],m[10],m[11],0,0,0,1);return out;}
 function makeTexture(asset){const tex=new THREE.CanvasTexture(canvasFromTexture(asset));tex.colorSpace=THREE.SRGBColorSpace;tex.wrapS=THREE.RepeatWrapping;tex.wrapT=THREE.RepeatWrapping;tex.magFilter=THREE.LinearFilter;tex.minFilter=THREE.LinearMipmapLinearFilter;return tex;}
@@ -20,7 +21,21 @@ function buildBones(model,group){
   const skeleton=new THREE.Skeleton(bones);skeleton.calculateInverses();
   return {skeleton,jointToIndex,bones,source};
 }
-function copyAttribute(geometry,name,attr,itemSize){if(attr)geometry.setAttribute(name,new THREE.BufferAttribute(new Float32Array(attr.values),itemSize));}
+function copyAttribute(geometry,name,attr,itemSize){
+  if(!attr)return;
+  geometry.setAttribute(name,new THREE.BufferAttribute(new Float32Array(attr.values),itemSize));
+}
+function copyPositionAttribute(geometry,shape){
+  const attr=shape.byUsage.get(VertexUsage.Position);if(!attr)return;
+  const values=new Float32Array(attr.values);
+  const [ox,oy,oz]=shape.positionOffset;
+  for(let i=0;i<attr.count;i++){
+    values[i*attr.components]+=ox;
+    if(attr.components>1)values[i*attr.components+1]+=oy;
+    if(attr.components>2)values[i*attr.components+2]+=oz;
+  }
+  geometry.setAttribute('position',new THREE.BufferAttribute(values,3));
+}
 function skinAttributes(shape,primitiveSet,bones){
   if(!bones)return null;
   const boneAttr=shape.byUsage.get(VertexUsage.BoneIndex),weightAttr=shape.byUsage.get(VertexUsage.BoneWeight),count=shape.vertexCount;
@@ -41,7 +56,7 @@ function skinAttributes(shape,primitiveSet,bones){
 }
 function makeGeometry(shape,primitiveSet,indexStream,bones){
   const geometry=new THREE.BufferGeometry();
-  copyAttribute(geometry,'position',shape.byUsage.get(VertexUsage.Position),3);
+  copyPositionAttribute(geometry,shape);
   copyAttribute(geometry,'normal',shape.byUsage.get(VertexUsage.Normal),3);
   copyAttribute(geometry,'uv',shape.byUsage.get(VertexUsage.TextureCoordinate0),2);
   const skin=skinAttributes(shape,primitiveSet,bones);
@@ -69,9 +84,39 @@ export function createModelInstance(model,textures,{shadows=true}={}){
       group.add(object);
     }
   }
-  group.userData.hopperSkeleton=bones;group.userData.hopperMaterials=materials;
+  group.userData.hopperSkeleton=bones;group.userData.hopperMaterials=materials;group.userData.hopperAnimationMaps=new Map();
   return group;
 }
+
+function setBindTransform(bone,source){
+  bone.position.set(source.translation[0],source.translation[1],source.translation[2]);
+  bone.rotation.set(source.rotation[0],source.rotation[1],source.rotation[2],'XYZ');
+  bone.scale.set(source.scale[0],source.scale[1],source.scale[2]);
+}
+
+export function resetSkeletonPose(root){
+  const rig=root.userData.hopperSkeleton;if(!rig)return;
+  for(let i=0;i<rig.bones.length;i++)setBindTransform(rig.bones[i],rig.source[i]);
+  root.updateMatrixWorld(true);rig.skeleton.update();
+}
+
+export function applySkeletalAnimation(root,animation,frame,{loop=true}={}){
+  const rig=root.userData.hopperSkeleton;if(!rig||!animation)return;
+  const count=animation.frameCount||1;
+  const f=loop?((frame%count)+count)%count:Math.max(0,Math.min(count,frame));
+  let tracks=root.userData.hopperAnimationMaps.get(animation.name);
+  if(!tracks){tracks=new Map(animation.tracks.map(track=>[track.path||track.name,track]));root.userData.hopperAnimationMaps.set(animation.name,tracks);}
+  for(let i=0;i<rig.bones.length;i++){
+    const bone=rig.bones[i],source=rig.source[i],track=tracks.get(source.name);
+    if(!track){setBindTransform(bone,source);continue;}
+    const t=sampleTransformTrack(track,f,source);
+    bone.position.set(t.translation[0],t.translation[1],t.translation[2]);
+    bone.rotation.set(t.rotation[0],t.rotation[1],t.rotation[2],'XYZ');
+    bone.scale.set(t.scale[0],t.scale[1],t.scale[2]);
+  }
+  root.updateMatrixWorld(true);rig.skeleton.update();
+}
+
 export function disposeModelInstance(root){
   const materials=new Set();root.traverse(obj=>{obj.geometry?.dispose?.();for(const mat of (Array.isArray(obj.material)?obj.material:[obj.material]))if(mat){materials.add(mat);mat.map?.dispose?.();}});
   for(const mat of materials)mat.dispose?.();
