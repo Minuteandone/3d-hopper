@@ -12,7 +12,7 @@
     <header class="topbar">
       <div>
         <h1>3D Hopper <span>web port</span></h1>
-        <p>ARM-translated browser port · original code data + assets loaded from your ROM</p>
+        <p>Work-in-progress executable translation · original assets loaded from your ROM</p>
       </div>
       <label class="rom-button">
         <input id="romInput" type="file" accept=".app,.cxi,application/octet-stream" />
@@ -39,12 +39,6 @@
         <canvas id="titleArt"></canvas>
         <canvas id="pressArt"></canvas>
         <button id="startButton">Start</button>
-      </div>
-
-      <div id="hud" class="hud hidden">
-        <div><b>STAGE</b> <span id="stageNo">1</span></div>
-        <div><b>TIME</b> <span id="time">0.0</span></div>
-        <div><b>FALLS</b> <span id="falls">0</span></div>
       </div>
 
       <div id="finish" class="finish overlay hidden">
@@ -74,14 +68,14 @@
     <section class="controls">
       <div><b>Move:</b> WASD / arrow keys / touch / gamepad stick</div>
       <div><b>Bounce:</b> automatic — this is a pogo cat, rules are rules 🐱</div>
-      <label class="depth-control"><span>Depth</span><input id="depth" type="range" min="0" max="100" value="55" /></label>
+      <div><b>Stereo:</b> not emulated yet — the original 3DS slider changes stereoscopic depth, not camera zoom</div>
       <button id="audioToggle" class="audio-toggle" type="button" aria-pressed="false">🔊 ROM audio</button>
       <div id="romStatus" class="rom-status">Waiting for ROM…</div>
     </section>
 
     <details class="about">
       <summary>What is this?</summary>
-      <p>This port reads the E3 2010 <em>Tech Demo: 3D Hopper</em> executable and translates identified ARM gameplay routines/data into JavaScript at runtime: the four original stage layouts, floor construction rules, moving-platform logic, and core pogo physics. The cat and floors are rendered from their original BCMDL vertex/index streams and skeletons. It is not full CPU emulation; Three.js still replaces the original graphics engine, material pipeline, camera, and part of the collision plumbing.</p>
+      <p>This is a work-in-progress reverse-engineered web port of the E3 2010 <em>Tech Demo: 3D Hopper</em>. It can parse the prototype executable and original ROM assets, but several gameplay routine meanings, controller/camera behavior, animation timing, effects, and collision details are still under active verification. The cat and floor meshes come from the original BCMDL files; the browser renderer is not Nintendo's original engine.</p>
     </details>
   </main>
 
