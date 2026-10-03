@@ -97,7 +97,10 @@ export class HopperGame {
   resize(){const w=Math.max(1,this.host.clientWidth),h=Math.max(1,this.host.clientHeight);this.renderer.setSize(w,h,false);this.camera.aspect=w/h;this.camera.updateProjectionMatrix();}
 
   #clearStage(){
-    while(this.stageGroup.children.length){const o=this.stageGroup.children.pop();o.traverse?.(x=>{if(x.geometry)x.geometry.dispose();});}
+    while(this.stageGroup.children.length){
+      const o=this.stageGroup.children[0];this.stageGroup.remove(o);
+      o.traverse?.(x=>{if(x.geometry)x.geometry.dispose();});
+    }
     this.platforms=[];
   }
 
@@ -120,14 +123,15 @@ export class HopperGame {
     return runtime;
   }
 
-  #buildStage(index,newCampaign=false){
+  #buildStage(index,newCampaign=false,preserveElapsed=false){
+    const previousElapsed=this.elapsedFrames;
     if(newCampaign)this.state=createGameState(this.program);
     this.state.stageIndex=index;this.#clearStage();
     const records=activeStageRecords(this.program,this.state,index);
     this.platforms=records.map(r=>this.#makeFloor(r));
     const start=findStartRecord(records);this.state.currentFloorIndex=start.index;
     this.#resetPlayer(start);
-    this.elapsedFrames=0;
+    this.elapsedFrames=preserveElapsed?previousElapsed:0;
     this.callbacks.onStage?.(index+1,{recordCount:records.length,rescueCounter:this.state.stage2ExtraCounter});
     this.#camera(true);
   }
@@ -201,11 +205,12 @@ export class HopperGame {
     const before=this.state.stage2ExtraCounter;noteFall(this.program,this.state);
     const rebuild=before!==this.state.stage2ExtraCounter;
     this.callbacks.onFalls?.(this.state.falls,{rescueCounter:this.state.stage2ExtraCounter,rebuild});
-    if(rebuild)this.#buildStage(this.state.stageIndex,false);else this.#resetPlayer();
+    if(rebuild)this.#buildStage(this.state.stageIndex,false,true);else this.#resetPlayer();
   }
 
   #fixedTick(){
     if(!this.playing)return;
+    this.elapsedFrames++;
     this.#readGamepad();this.#updateFloors();
     const input=this.#inputVector();this.#steer(input);
     this.player.grounded=false;
@@ -214,7 +219,7 @@ export class HopperGame {
     this.player.pos.copy(current);
     const floor=this.#landingFloor(previous,current);if(floor)this.#land(floor);
     if(this.player.pos.y<this.program.physics.failY)this.#fall();
-    this.elapsedFrames++;this.callbacks.onTime?.(this.elapsedFrames/this.program.physics.fixedHz);
+    this.callbacks.onTime?.(this.elapsedFrames/this.program.physics.fixedHz);
     this.playerMesh.position.copy(this.player.pos);this.playerMesh.position.y+=1.05;
     this.playerMesh.rotation.z=THREE.MathUtils.lerp(this.playerMesh.rotation.z,-input.x*.15,.18);
     this.playerMesh.rotation.x=THREE.MathUtils.lerp(this.playerMesh.rotation.x,input.z*.1,.18);
