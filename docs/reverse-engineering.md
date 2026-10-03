@@ -73,6 +73,23 @@ The ordinary path in `0x13DD58..0x13DF18` increments a per-floor timer, wraps it
 
 The runtime stores a velocity toward that desired position and applies the previous velocity on the next original frame, which the JavaScript runtime preserves.
 
+## BCMDL model decoding
+
+The browser now also decodes the prototype's original static/skinned model data rather than replacing the cat and floors with primitive meshes.
+
+Validated model facts from this build:
+
+- `neko_hopping_model`: three shapes with **494 / 211 / 21 vertices**.
+- The cat skeleton contains **24 bones**; bone palettes, indices, and weights are recovered from the shape primitive sets.
+- `hopper_floor01_model` and `hopper_floor02_model`: **52 vertices each**, with approximately 10×10-unit authored floor bounds.
+- The floor builder's original X/Z scale is `spacing * 0.1`; its Y model scale is `0.4`.
+- Material TXOB references recover the original `hopping`, `nekopper`, and floor textures.
+- Every decoded index stream is bounds-checked against its corresponding real vertex buffer.
+
+The cat file also contains `neko_hopping_jump`, a 48-frame CANM skeletal animation. Its 2010 TransformAnimation member layout predates the later layout handled by common CGFX tooling, so the port deliberately does not fake that clip; the decoded 24-bone skeleton currently renders in bind pose.
+
+Several effect CMDLs, including the goal/star/opening resources, contain emitter/model shells but no static vertex/index stream. Their original ROM textures are currently rendered as billboards until that early emitter format is translated.
+
 ## Current fidelity boundary
 
-The web port now has real stage/code behavior, but it does not yet decode BCMDL vertex/index data or execute the original graphics/collision engine. Those are the next major fidelity targets.
+The web port now combines **translated original game routines/data** with **original BCMDL geometry, skeletons, textures, and BCSTM audio**. It still does not execute Nintendo's original graphics engine or ARM CPU directly. Three.js supplies the host renderer, PICA200 material behavior is approximated, collision is a browser translation of the recovered floor extents, CANM TransformAnimation remains to be decoded, and camera/stereo presentation remains browser-side.
