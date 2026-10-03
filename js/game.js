@@ -1,7 +1,5 @@
 import * as THREE from 'https://cdn.jsdelivr.net/npm/three@0.186.1/build/three.module.js';
-import { createModelInstance, disposeModelInstance, applySkeletalAnimation } from './model-renderer.js';
-import { HopperEffectHost } from './effect-renderer.js';
-import { LANDING_STAMP_SLOT,AIRBORNE_STAR_SLOT,FLOOR_EFFECT_SLOT,goalEffectSlots } from './effects.js';
+import { createModelInstance, disposeModelInstance } from './model-renderer.js';
 import { gridCoordinate } from './executable.js';
 import {
   createGameState,activeStageRecords,createFloorRuntime,tickFloorRuntime,noteFall,findStartRecord,
@@ -10,23 +8,23 @@ import {
 const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
 
 export class HopperGame {
-  constructor(host,assets,models,animations,effectRegistry,program,callbacks={}) {
-    this.host=host;this.assets=assets;this.models=models;this.animations=animations;this.effectRegistry=effectRegistry;this.program=program;this.callbacks=callbacks;
+  constructor(host,assets,models,program,callbacks={}) {
+    this.host=host;this.assets=assets;this.models=models;this.program=program;this.callbacks=callbacks;
     this.renderer=new THREE.WebGLRenderer({antialias:true,alpha:false,powerPreference:'high-performance'});
     this.renderer.setPixelRatio(Math.min(devicePixelRatio,2));
     this.renderer.shadowMap.enabled=true;this.renderer.shadowMap.type=THREE.PCFSoftShadowMap;
     this.renderer.outputColorSpace=THREE.SRGBColorSpace;this.host.appendChild(this.renderer.domElement);
 
     this.scene=new THREE.Scene();this.scene.background=new THREE.Color(0x9bdcf3);this.scene.fog=new THREE.Fog(0xb4e6f4,35,95);
-    this.effectHost=new HopperEffectHost(this.scene,this.assets,this.effectRegistry);
     this.camera=new THREE.PerspectiveCamera(47,5/3,.1,160);
     this.clock=new THREE.Clock();this.accumulator=0;
-    this.fixedStep=1/this.program.physics.fixedHz;
+    // Browser host cadence only. The original executable has per-update constants,
+    // but this port has not yet proven the game's scheduler frequency.
+    this.fixedStep=1/60;
     this.input={left:false,right:false,up:false,down:false};this.gamepad={x:0,y:0};
-    this.depth=.55;this.playing=false;this.elapsedFrames=0;
+    this.playing=false;this.elapsedFrames=0;
     this.state=createGameState(program);
     this.player={pos:new THREE.Vector3(),vel:new THREE.Vector3(),grounded:false};
-    this.playerAnimation=null;this.playerAnimFrame=0;this.playerAnimActive=false;
     this.platforms=[];this.stageGroup=new THREE.Group();this.scene.add(this.stageGroup);
 
     this.#lights();this.#makeSky();this.#makePlayer();this.#events();
@@ -53,10 +51,6 @@ export class HopperGame {
     const group=createModelInstance(model,this.assets,{shadows:true});
     group.name='ROM neko_hopping_model';
     this.scene.add(group);this.playerMesh=group;
-    this.playerAnimation=this.animations.get('neko_hopping_jump')??null;
-    if(!this.playerAnimation)throw new Error('The ROM did not provide neko_hopping_jump.');
-    this.playerAnimFrame=Math.max(0,this.playerAnimation.frameCount-1);this.playerAnimActive=false;
-    applySkeletalAnimation(this.playerMesh,this.playerAnimation,this.playerAnimFrame,{loop:false});
   }
 
   #events(){
@@ -74,7 +68,6 @@ export class HopperGame {
     });
   }
 
-  setDepth(v){this.depth=clamp(v,0,1);}
   resize(){const w=Math.max(1,this.host.clientWidth),h=Math.max(1,this.host.clientHeight);this.renderer.setSize(w,h,false);this.camera.aspect=w/h;this.camera.updateProjectionMatrix();}
 
   #clearStage(){
@@ -108,7 +101,7 @@ export class HopperGame {
   #buildStage(index,newCampaign=false,preserveElapsed=false){
     const previousElapsed=this.elapsedFrames;
     if(newCampaign)this.state=createGameState(this.program);
-    this.state.stageIndex=index;this.effectHost.clear();this.#clearStage();
+    this.state.stageIndex=index;this.#clearStage();
     const records=activeStageRecords(this.program,this.state,index);
     this.platforms=records.map(r=>this.#makeFloor(r));
     const start=findStartRecord(records);this.state.currentFloorIndex=start.index;
@@ -125,8 +118,6 @@ export class HopperGame {
     const center=floor?.center??start.position;
     this.player.pos.set(center[0],center[1]+this.program.physics.spawnClearance,center[2]);
     this.player.vel.set(0,0,0);this.player.grounded=false;this.state.currentFloorIndex=start.index;
-    this.playerAnimFrame=Math.max(0,this.playerAnimation.frameCount-1);this.playerAnimActive=false;
-    applySkeletalAnimation(this.playerMesh,this.playerAnimation,this.playerAnimFrame,{loop:false});
     this.playerMesh.position.copy(this.player.pos);
   }
 
@@ -181,11 +172,6 @@ export class HopperGame {
     this.player.vel.y=floor.velocity[1]+p.landingBouncePerFrame;
     this.player.pos.x+=floor.velocity[0];this.player.pos.z+=floor.velocity[2];
     this.player.grounded=true;this.state.currentFloorIndex=floor.index;
-    const effectPos=new THREE.Vector3(this.player.pos.x,floor.center[1]+.15,this.player.pos.z);
-    this.effectHost.spawnSlot(LANDING_STAMP_SLOT,effectPos);
-    if(floor.record.flag)this.effectHost.spawnSlot(FLOOR_EFFECT_SLOT,new THREE.Vector3(...floor.center));
-    this.playerAnimFrame=0;this.playerAnimActive=true;
-    applySkeletalAnimation(this.playerMesh,this.playerAnimation,0,{loop:false});
     if(floor.record.type===3)this.#win();
   }
 
@@ -196,47 +182,33 @@ export class HopperGame {
     if(rebuild)this.#buildStage(this.state.stageIndex,false,true);else this.#resetPlayer();
   }
 
-  #updatePlayerAnimation(){
-    if(!this.playerAnimation)return;
-    if(this.playerAnimActive){
-      this.playerAnimFrame=Math.min(this.playerAnimation.frameCount-1,this.playerAnimFrame+1);
-      if(this.playerAnimFrame>=this.playerAnimation.frameCount-1)this.playerAnimActive=false;
-    }
-    applySkeletalAnimation(this.playerMesh,this.playerAnimation,this.playerAnimFrame,{loop:false});
-  }
-
   #fixedTick(){
     if(!this.playing)return;
     this.elapsedFrames++;
     this.#readGamepad();this.#updateFloors();
     const input=this.#inputVector();this.#steer(input);
     this.player.grounded=false;
-    const previousVy=this.player.vel.y;
     this.player.vel.y-=this.program.physics.gravityPerFrame;
     const previous=this.player.pos.clone(),current=this.player.pos.clone().add(this.player.vel);
     this.player.pos.copy(current);
     const floor=this.#landingFloor(previous,current);if(floor)this.#land(floor);
-    else if(previousVy>0&&this.player.vel.y<=0)this.effectHost.spawnSlot(AIRBORNE_STAR_SLOT,this.player.pos.clone().add(new THREE.Vector3(0,1.2,0)));
     if(this.player.pos.y<this.program.physics.failY)this.#fall();
-    this.callbacks.onTime?.(this.elapsedFrames/this.program.physics.fixedHz);
-    this.#updatePlayerAnimation();
+    this.callbacks.onTime?.(this.elapsedFrames/60);
     // The original CMDL root is authored at the pogo contact point.
     this.playerMesh.position.copy(this.player.pos);
   }
 
   #win(){
     if(!this.playing)return;this.playing=false;
-    const effectPos=this.player.pos.clone().add(new THREE.Vector3(0,1,0));
-    for(const slot of goalEffectSlots(this.state.stageIndex))this.effectHost.spawnSlot(slot,effectPos);
     const final=this.state.stageIndex===this.program.stages.length-1;
-    this.callbacks.onWin?.({stage:this.state.stageIndex+1,stageIndex:this.state.stageIndex,time:this.elapsedFrames/this.program.physics.fixedHz,falls:this.state.falls,final,rescueCounter:this.state.stage2ExtraCounter});
+    this.callbacks.onWin?.({stage:this.state.stageIndex+1,stageIndex:this.state.stageIndex,time:this.elapsedFrames/60,falls:this.state.falls,final,rescueCounter:this.state.stage2ExtraCounter});
   }
 
   #camera(snap=false){
-    const d=15+this.depth*12,h=8+this.depth*4;
+    // Temporary browser camera. The original camera/stereo path is not translated yet.
     const target=new THREE.Vector3(this.player.pos.x,this.player.pos.y+1.5,this.player.pos.z-4);
-    const wanted=new THREE.Vector3(this.player.pos.x*.88,this.player.pos.y+h,this.player.pos.z+d);
-    this.camera.position.lerp(wanted,snap?1:.09);this.camera.lookAt(target);this.camera.fov=52-this.depth*11;this.camera.updateProjectionMatrix();
+    const wanted=new THREE.Vector3(this.player.pos.x*.88,this.player.pos.y+10.5,this.player.pos.z+21);
+    this.camera.position.lerp(wanted,snap?1:.09);this.camera.lookAt(target);this.camera.fov=46;this.camera.updateProjectionMatrix();
   }
 
   #tick(){
@@ -245,6 +217,6 @@ export class HopperGame {
       this.accumulator=Math.min(this.accumulator+dt,.25);
       while(this.accumulator>=this.fixedStep){this.#fixedTick();this.accumulator-=this.fixedStep;}
     }
-    this.effectHost.update(dt);this.#camera(false);this.renderer.render(this.scene,this.camera);
+    this.#camera(false);this.renderer.render(this.scene,this.camera);
   }
 }
