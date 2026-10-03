@@ -1,6 +1,6 @@
 import * as THREE from 'https://cdn.jsdelivr.net/npm/three@0.186.1/build/three.module.js';
 import { createModelInstance, disposeModelInstance } from './model-renderer.js';
-import { gridCoordinate } from './executable.js';
+import { gridCoordinate, transformControlVector } from './executable.js';
 import {
   createGameState,activeStageRecords,createFloorRuntime,tickFloorRuntime,noteFall,findStartRecord,
 } from './runtime.js';
@@ -168,7 +168,8 @@ export class HopperGame {
   #inputVector(){
     let x=(this.input.right?1:0)-(this.input.left?1:0)+this.gamepad.x;
     let z=(this.input.down?1:0)-(this.input.up?1:0)+this.gamepad.y;
-    const n=Math.hypot(x,z);if(n>1){x/=n;z/=n;}return {x,z};
+    const n=Math.hypot(x,z);if(n>1){x/=n;z/=n;}
+    return transformControlVector(this.program.controls,this.state.stageIndex,x,z);
   }
 
   #updateFloors(){
