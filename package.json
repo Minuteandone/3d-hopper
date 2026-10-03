@@ -8,6 +8,7 @@
     "test:runtime": "node tests/runtime-test.mjs",
     "test:animation": "node tests/animation-test.mjs",
     "test:emitters": "node tests/emitters-test.mjs",
-    "test:effects": "node tests/effects-test.mjs"
+    "test:effects": "node tests/effects-test.mjs",
+    "test:bcsar": "node tests/bcsar-test.mjs"
   }
 }
