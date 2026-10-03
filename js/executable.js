@@ -11,12 +11,15 @@ function zstr(bytes,o,max=0x400){
 }
 
 const GAME_DESCRIPTOR_VA=0x191120;
+const STAGE_GLOBAL_INITIALIZER=0x16b424;
 const EXPECTED_SIGNATURES={
   0x13c034:0xe92d4ff0,
   0x13c81c:0xe92d4ff0,
   0x13ebd4:0xe59f0018,
   0x13f550:0xe92d47f0,
   0x1517dc:0xe92d4ff0,
+  0x16b424:0xe59f03c0,
+  0x16b7e8:0xe12fff1e,
 };
 
 export class HopperExecutable {
@@ -92,9 +95,74 @@ function readFloorRecord(exe,va,index){
     offset:[exe.readF32(va+0x1c),exe.readF32(va+0x20),exe.readF32(va+0x24)],
     parameter:exe.readU32(va+0x28),
     flag:exe.readU8(va+0x2c),
+    secondFlag:exe.readU8(va+0x2d),
   };
 }
 
+/**
+ * Translation of ARM/VFP routine 0x16B424..0x16B7E8.
+ * The stage arrays are C++ globals whose position/motion fields are filled at startup.
+ */
+function applyStageGlobalConstructor(exe,stages){
+  const f=va=>exe.readF32(va);
+  const C={
+    zero:f(0x16b7f4),eighty:f(0x16b7f8),
+    y45:f(0x16b800),neg8:f(0x16b804),six:f(0x16b808),three:f(0x16b80c),
+    eight:f(0x16b810),neg16:f(0x16b814),nine:f(0x16b818),twelve:f(0x16b81c),fifteen:f(0x16b820),
+    eighteen:f(0x16b824),four:f(0x16b828),twentyTwo:f(0x16b82c),neg4:f(0x16b830),ten:f(0x16b834),
+    two:f(0x16b838),neg10:f(0x16b83c),y475:f(0x16b840),neg20:f(0x16b844),y95:f(0x16b848),
+    neg32:f(0x16b84c),neg9:f(0x16b850),neg3:f(0x16b854),neg275:f(0x16b858),sixteen:f(0x16b85c),
+  };
+  const set=(stage,index,position,offset=[C.zero,C.zero,C.zero])=>{
+    const r=stages[stage].records[index];
+    r.position=[...position];r.offset=[...offset];r.initializedBy=STAGE_GLOBAL_INITIALIZER;
+  };
+
+  set(0,0,[C.zero,C.y45,C.zero]);
+  set(0,1,[C.neg8,C.six,C.neg8]);
+  set(0,2,[C.zero,C.three,C.neg8]);
+  set(0,3,[C.eight,C.zero,C.neg8]);
+  set(0,4,[C.neg8,C.three,C.neg16]);
+  set(0,5,[C.zero,C.three,C.neg16]);
+  set(0,6,[C.eight,C.zero,C.neg16]);
+  set(0,7,[C.neg8,C.nine,C.neg16]);
+  set(0,8,[C.zero,C.twelve,C.neg16]);
+  set(0,9,[C.eight,C.fifteen,C.neg16]);
+
+  set(1,0,[C.zero,C.zero,C.zero]);
+  set(1,1,[C.eighteen,C.four,C.zero]);
+  set(1,2,[C.twentyTwo,C.eight,C.neg4]);
+  set(1,3,[C.ten,C.twelve,C.zero]);
+
+  set(2,0,[C.zero,C.two,C.zero]);
+  set(2,1,[C.zero,C.zero,C.neg10]);
+  set(2,2,[C.six,C.y475,C.neg20]);
+  set(2,3,[C.zero,C.y95,C.neg32]);
+  set(2,4,[C.neg9,C.neg3,C.neg275]);
+
+  set(3,0,[C.zero,C.zero,C.zero]);
+  set(3,1,[C.eight,C.zero,C.neg16],[C.neg8,C.zero,C.eight]);
+  set(3,2,[C.sixteen,C.zero,C.neg32]);
+  return stages;
+}
+
+export function gridCoordinate(count,spacing,index){
+  return 0.5*(1-count)*spacing+index*spacing;
+}
+
+/** Translation of the ordinary moving-floor sine branch at 0x13DD58..0x13DF18. */
+export function movingFloorAt(record,timer){
+  if(!(record.parameter>0))return {timer:0,position:[...record.position],velocity:[0,0,0]};
+  const next=(timer+1)>=record.parameter?0:(timer+1);
+  const wave=Math.sin((Math.PI*2*next)/record.parameter);
+  const position=record.position.map((v,i)=>v+record.offset[i]*wave);
+  return {timer:next,position,wave};
+}
+
+/**
+ * Lift identified game-specific data and constants into a browser-friendly program description.
+ * This is a narrow source translation of identified ARM routines, not CPU emulation.
+ */
 export function liftHopperProgram(romOrBuffer){
   const buffer=romOrBuffer?.buffer instanceof ArrayBuffer?romOrBuffer.buffer:romOrBuffer;
   const exe=new HopperExecutable(buffer);
@@ -109,6 +177,8 @@ export function liftHopperProgram(romOrBuffer){
     for(let j=0;j<count;j++)records.push(readFloorRecord(exe,recordsAddress+j*48,j));
     stages.push({index:i,address:d,recordsAddress,count,kind,id,records});
   }
+  applyStageGlobalConstructor(exe,stages);
+
   const physics={
     gravityPerFrame:exe.readF32(0x13cce4),
     specialGravityPerFrame:exe.readF32(0x13ccf8),
@@ -127,17 +197,23 @@ export function liftHopperProgram(romOrBuffer){
   const floorBuilder={
     recordStride:48,
     gridCenterFactor:exe.readF32(0x13c4d8),
+    collisionHalfHeight:exe.readF32(0x13c4e0),
     tileModelScale:exe.readF32(0x13c4e4),
     sourceAddress:0x13c034,
   };
-  if(!near(floorBuilder.gridCenterFactor,0.5)||!near(floorBuilder.tileModelScale,0.1))throw new Error('Floor-builder constants do not match the supported build.');
+  if(!near(floorBuilder.gridCenterFactor,0.5)||!near(floorBuilder.collisionHalfHeight,0.4)||!near(floorBuilder.tileModelScale,0.1)){
+    throw new Error('Floor-builder constants do not match the supported build.');
+  }
   return {
-    build:{title:exe.meta.title,sceneName:exe.readString(sceneNamePtr),sceneNamePtr,factoryAddress:factory,
-      routines:{floorBuilder:0x13c034,gameplayUpdate:0x13c81c,stageConstruction:0x13f550,playerReset:0x1517dc}},
-    stages,physics,floorBuilder,executable:exe,
+    build:{
+      title:exe.meta.title,sceneName:exe.readString(sceneNamePtr),sceneNamePtr,factoryAddress:factory,
+      routines:{
+        floorBuilder:0x13c034,gameplayUpdate:0x13c81c,stageConstruction:0x13f550,
+        playerReset:0x1517dc,stageGlobalInitializer:STAGE_GLOBAL_INITIALIZER,movingFloorUpdate:0x13dd58,
+      },
+    },
+    stages,physics,floorBuilder,
+    initialState:{stageIndex:0,stage2ExtraCounter:2},
+    executable:exe,
   };
-}
-
-export function gridCoordinate(count,spacing,index){
-  return 0.5*(1-count)*spacing+index*spacing;
 }
