@@ -49,21 +49,13 @@ Routine `0x13C034`:
 - stores collision half-height `0.4`;
 - stores depth as `rows * spacing`.
 
-## Core pogo physics
+## Gameplay constants — verified values, semantics still under audit
 
-Recovered constants used by the translated fixed 60 Hz simulation:
+The following literal floating-point values are verified at the noted gameplay/setup code locations: `0.012`, `0.006`, `0.5`, `24`, `47`, `0.15`, `0.25`, `0.03`, `0.2`, `-25`, and `7.35`. A `0.42` literal is also used in a landing-related branch.
 
-- gravity: `0.012` per frame
-- special gravity: `0.006`
-- landing bounce: `0.42`
-- airborne input scale: `0.15`
-- grounded input scale: `0.25`
-- airborne velocity lerp: `0.03`
-- movement-vector scale: `0.2`
-- spawn clearance: `7.35`
-- fail Y: `-25`
+Earlier revisions of this document over-labeled these values as a complete fixed-60-Hz physics model. That was not justified. The executable clearly uses them in motion/state code, but exact units and responsibilities must come from translating the surrounding instructions, not from the values alone.
 
-Landing sets vertical velocity to **platform vertical velocity + 0.42**.
+Likewise, routine `0x1517DC` was previously called "player reset." That was incorrect. It is a much larger state-dependent setup/update routine that is called from reset/progression paths.
 
 ## Moving floor
 
@@ -86,7 +78,7 @@ Validated model facts from this build:
 - Material TXOB references recover the original `hopping`, `nekopper`, and floor textures.
 - Every decoded index stream is bounds-checked against its corresponding real vertex buffer.
 
-The cat file also contains `neko_hopping_jump`, a 48-frame CANM skeletal animation. The port now decodes its early transform-member flags plus 59 Hermite128 curves across 18 bone tracks and applies them to the decoded 24-bone skeleton. The remaining uncertainty is the exact generic NintendoWare controller cadence; the browser currently treats the non-looping clip as a one-shot pogo animation.
+The cat file also contains `neko_hopping_jump`, a 48-frame CANM skeletal animation. The parser decodes its transform-member flags plus 59 Hermite128 curves across 18 bone tracks. The live port does **not** currently trigger the clip, because the original controller timing/activation path has not yet been proven.
 
 The effect resource contains **16 `PEMT` emitter objects**. Their exact binary boundaries are now parsed by emitter kind: kind 8 = `0xDC` bytes, kind 1 = `0xF0`, kind 4 = `0xF8`. This matters because dictionary order is not physical order (for example, `goal05` lives much earlier in the file).
 
@@ -100,10 +92,8 @@ The ARM constructor's 16-slot registry is also translated:
 - slots 10-14 goal01..05
 - slot 15 floor effect
 
-Recovered activation rules include landing stamp = slot 1, stage shower = `6 + stageIndex`, normal goal pair = slots 10/11, Stage 4 goal pair = 12/13, floor effect = slot 15 when the floor flag is set, and ending starshower00 beginning at original ending frame 240.
-
-The browser now uses those original resources/slot choices, but particle trajectories are still a clearly separated Three.js approximation until the full early NintendoWare PEMT runtime is translated.
+The resource-slot table is useful for tracing references, but earlier revisions promoted several call-site interpretations into named activation rules too early. The live port no longer triggers PEMT effects until those controller paths are proven end-to-end.
 
 ## Current fidelity boundary
 
-The web port now combines **translated original game routines/data** with **original BCMDL geometry, skeletons, textures, and BCSTM audio**. It still does not execute Nintendo's original graphics engine or ARM CPU directly. Three.js supplies the host renderer, PICA200 material behavior is approximated, collision is a browser translation of the recovered floor extents, PEMT particle integration and the exact generic CANM controller cadence remain to be decoded, and camera/stereo presentation remains browser-side.
+The web port now combines **translated original game routines/data** with **original BCMDL geometry, skeletons, textures, and BCSTM audio**. It still does not execute Nintendo's original graphics engine or ARM CPU directly. Three.js supplies the host renderer, PICA200 material behavior is approximated, collision is a browser translation of the recovered floor extents, PEMT particle integration, CANM controller timing, the complete movement/collision state machine, and the original camera/stereo path remain to be decoded.
