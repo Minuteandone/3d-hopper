@@ -26,7 +26,7 @@
         <div class="boot-card">
           <div class="pogo-icon" aria-hidden="true">🐱<span></span></div>
           <h2>Load your original build</h2>
-          <p>The ROM stays on this device. The site reads the prototype ROFS and decodes the game's CGFX textures and BCSTM audio locally.</p>
+          <p>The ROM stays on this device. The site verifies/lifts the prototype ARM game data and decodes its BCMDL meshes, skeletons, CGFX textures, and BCSTM audio locally.</p>
           <label class="rom-button big">
             <input id="romInputBig" type="file" accept=".app,.cxi,application/octet-stream" />
             <span>Open 3D_Hopper.app</span>
@@ -81,7 +81,7 @@
 
     <details class="about">
       <summary>What is this?</summary>
-      <p>This port reads the E3 2010 <em>Tech Demo: 3D Hopper</em> executable and translates identified ARM gameplay routines/data into JavaScript at runtime: the four original stage layouts, floor construction rules, moving-platform logic, and core pogo physics. It is not full CPU emulation; rendering and some engine/collision plumbing are still Three.js replacements.</p>
+      <p>This port reads the E3 2010 <em>Tech Demo: 3D Hopper</em> executable and translates identified ARM gameplay routines/data into JavaScript at runtime: the four original stage layouts, floor construction rules, moving-platform logic, and core pogo physics. The cat and floors are rendered from their original BCMDL vertex/index streams and skeletons. It is not full CPU emulation; Three.js still replaces the original graphics engine, material pipeline, camera, and part of the collision plumbing.</p>
     </details>
   </main>
 
