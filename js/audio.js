@@ -182,22 +182,12 @@ export class HopperAudio {
     }
   }
 
-  playBgm() {
+  playStageBgm() {
+    // cplay.bcsar identifies DUMMY_LOOPED as its own dummy stream. The real
+    // BGM_STAGE cue is a CSEQ using an internal bank/wave archive, which is not
+    // translated yet. Do not substitute the dummy stream for stage music.
     this.#stop(this.bgm); this.bgm = null;
-    this.#stop(this.oneShot); this.oneShot = null;
-    const path = 'sound/stream/DUMMY_LOOPED.bcstm';
-    if (this.muted || !this.rom.has(path)) return;
-
-    const context = this.#context();
-    const decoded = this.#decoded(path);
-    const source = context.createBufferSource();
-    source.buffer = this.#buffer(path);
-    source.loop = decoded.loop;
-    source.loopStart = decoded.loopStart / decoded.sampleRate;
-    source.loopEnd = decoded.loopEnd / decoded.sampleRate;
-    source.connect(context.destination);
-    source.start();
-    this.bgm = source;
+    return false;
   }
 
   playCongrats() {
