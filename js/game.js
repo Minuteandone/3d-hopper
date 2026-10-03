@@ -34,7 +34,6 @@ export class HopperGame {
     this.state=createGameState(program);
     this.player={pos:new THREE.Vector3(),vel:new THREE.Vector3(),grounded:false};
     this.platforms=[];this.particles=[];this.stageGroup=new THREE.Group();this.scene.add(this.stageGroup);
-    this.materials=new Map();
 
     this.#lights();this.#makeSky();this.#makePlayer();this.#events();
     this.resize();new ResizeObserver(()=>this.resize()).observe(host);
@@ -52,13 +51,6 @@ export class HopperGame {
     const sea=new THREE.Mesh(new THREE.PlaneGeometry(220,220),new THREE.MeshBasicMaterial({color:0xbce9f6,side:THREE.DoubleSide}));
     sea.rotation.x=-Math.PI/2;sea.position.y=-26;this.scene.add(sea);
     const grid=new THREE.GridHelper(180,36,0x7bb8ca,0x9fd3df);grid.position.y=-25.96;this.scene.add(grid);
-  }
-
-  #materialFor(type){
-    const key=type===3?'goal':'normal';if(this.materials.has(key))return this.materials.get(key);
-    const asset=this.assets.get(type===3?'hopper_floor02':'hopper_floor01')||this.assets.get('hopper_floor01');
-    const mat=asset?new THREE.MeshStandardMaterial({map:makeTexture(asset),roughness:.9,metalness:0,color:0xffffff}):new THREE.MeshStandardMaterial({color:type===3?0xf3d45b:0xb8d7a6,roughness:.9});
-    this.materials.set(key,mat);return mat;
   }
 
   #makePlayer(){
