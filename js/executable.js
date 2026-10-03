@@ -12,6 +12,7 @@ function zstr(bytes,o,max=0x400){
 
 const GAME_DESCRIPTOR_VA=0x191120;
 const STAGE_GLOBAL_INITIALIZER=0x16b424;
+const STARTUP_FLOOR_RECORD_VA=0x19e0c8;
 const EXPECTED_SIGNATURES={
   0x13c034:0xe92d4ff0,
   0x13c81c:0xe92d4ff0,
@@ -103,7 +104,7 @@ function readFloorRecord(exe,va,index){
  * Translation of ARM/VFP routine 0x16B424..0x16B7E8.
  * The stage arrays are C++ globals whose position/motion fields are filled at startup.
  */
-function applyStageGlobalConstructor(exe,stages){
+function applyStageGlobalConstructor(exe,stages,startupFloor){
   const f=va=>exe.readF32(va);
   const C={
     zero:f(0x16b7f4),eighty:f(0x16b7f8),
@@ -113,6 +114,10 @@ function applyStageGlobalConstructor(exe,stages){
     two:f(0x16b838),neg10:f(0x16b83c),y475:f(0x16b840),neg20:f(0x16b844),y95:f(0x16b848),
     neg32:f(0x16b84c),neg9:f(0x16b850),neg3:f(0x16b854),neg275:f(0x16b858),sixteen:f(0x16b85c),
   };
+  startupFloor.position=[C.zero,C.eighty,C.zero];
+  startupFloor.offset=[C.zero,C.zero,C.zero];
+  startupFloor.initializedBy=STAGE_GLOBAL_INITIALIZER;
+
   const set=(stage,index,position,offset=[C.zero,C.zero,C.zero])=>{
     const r=stages[stage].records[index];
     r.position=[...position];r.offset=[...offset];r.initializedBy=STAGE_GLOBAL_INITIALIZER;
@@ -177,7 +182,8 @@ export function liftHopperProgram(romOrBuffer){
     for(let j=0;j<count;j++)records.push(readFloorRecord(exe,recordsAddress+j*48,j));
     stages.push({index:i,address:d,recordsAddress,count,kind,id,records});
   }
-  applyStageGlobalConstructor(exe,stages);
+  const startupFloor=readFloorRecord(exe,STARTUP_FLOOR_RECORD_VA,-1);
+  applyStageGlobalConstructor(exe,stages,startupFloor);
 
   const physics={
     gravityPerFrame:exe.readF32(0x13cce4),
@@ -208,10 +214,10 @@ export function liftHopperProgram(romOrBuffer){
       title:exe.meta.title,sceneName:exe.readString(sceneNamePtr),sceneNamePtr,factoryAddress:factory,
       routines:{
         floorBuilder:0x13c034,gameplayUpdate:0x13c81c,stageConstruction:0x13f550,
-        stateSetup:0x1517dc,stageGlobalInitializer:STAGE_GLOBAL_INITIALIZER,movingFloorUpdate:0x13dd58,
+        stateSetup:0x1517dc,stageGlobalInitializer:STAGE_GLOBAL_INITIALIZER,startupSetup:0x13f8c0,movingFloorUpdate:0x13dd58,
       },
     },
-    stages,physics,floorBuilder,
+    stages,startupFloor,physics,floorBuilder,
     initialState:{stageIndex:0,stage2ExtraCounter:2},
     executable:exe,
   };
