@@ -25,6 +25,7 @@ jobs:
           node --check js/animation.js
           node --check js/emitters.js
           node --check js/effects.js
+          node --check js/effect-renderer.js
           node --check js/prototype-code.js
           node --check js/audio.js
           node --check js/game.js
