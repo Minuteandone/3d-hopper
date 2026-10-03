@@ -29,7 +29,8 @@ export class HopperGame {
 
     this.#lights();this.#makeSky();this.#makePlayer();this.#events();
     this.resize();new ResizeObserver(()=>this.resize()).observe(host);
-    this.#buildStage(0,true);this.renderer.setAnimationLoop(()=>this.#tick());
+    this.openingPrepared=false;this.openingFloor=null;
+    this.#buildOpeningStage();this.renderer.setAnimationLoop(()=>this.#tick());
   }
 
   #lights(){
@@ -98,14 +99,45 @@ export class HopperGame {
     return runtime;
   }
 
+  #placePlayerOnFloor(floor){
+    const center=floor.center;
+    this.player.pos.set(center[0],center[1]+this.program.physics.spawnClearance,center[2]);
+    this.player.vel.set(0,0,0);this.player.grounded=false;this.state.currentFloorIndex=floor.index;
+    this.playerMesh.position.copy(this.player.pos);
+  }
+
+  #buildOpeningStage(){
+    this.state=createGameState(this.program);this.state.stageIndex=0;this.#clearStage();
+    const records=activeStageRecords(this.program,this.state,0);
+    this.platforms=records.map(r=>this.#makeFloor(r));
+    const openingRecord={...this.program.startupFloor,index:records.length};
+    const opening=this.#makeFloor(openingRecord);
+    this.platforms.push(opening);this.openingFloor=opening;this.openingPrepared=true;
+    this.#placePlayerOnFloor(opening);this.elapsedFrames=0;
+    this.callbacks.onStage?.(1,{recordCount:records.length,startupFloor:true,rescueCounter:this.state.stage2ExtraCounter});
+    this.#camera(true);
+  }
+
+  #releaseOpeningFloor(){
+    if(!this.openingPrepared||!this.openingFloor)return;
+    const floor=this.openingFloor;
+    this.stageGroup.remove(floor.group);disposeModelInstance(floor.group);
+    this.platforms=this.platforms.filter(p=>p!==floor);
+    this.openingFloor=null;this.openingPrepared=false;
+    // The executable leaves the current-floor index pointing at the removed
+    // startup slot until the next collision updates it.
+  }
+
   #buildStage(index,newCampaign=false,preserveElapsed=false){
     const previousElapsed=this.elapsedFrames;
     if(newCampaign)this.state=createGameState(this.program);
+    this.openingPrepared=false;this.openingFloor=null;
     this.state.stageIndex=index;this.#clearStage();
     const records=activeStageRecords(this.program,this.state,index);
     this.platforms=records.map(r=>this.#makeFloor(r));
-    const start=findStartRecord(records);this.state.currentFloorIndex=start.index;
-    this.#resetPlayer(start);
+    const start=findStartRecord(records);
+    const floor=this.platforms.find(p=>p.index===start.index);
+    this.#placePlayerOnFloor(floor);
     this.elapsedFrames=preserveElapsed?previousElapsed:0;
     this.callbacks.onStage?.(index+1,{recordCount:records.length,rescueCounter:this.state.stage2ExtraCounter});
     this.#camera(true);
@@ -115,13 +147,17 @@ export class HopperGame {
     const records=activeStageRecords(this.program,this.state,this.state.stageIndex);
     const start=startRecord??findStartRecord(records);
     const floor=this.platforms.find(p=>p.index===start.index);
-    const center=floor?.center??start.position;
-    this.player.pos.set(center[0],center[1]+this.program.physics.spawnClearance,center[2]);
-    this.player.vel.set(0,0,0);this.player.grounded=false;this.state.currentFloorIndex=start.index;
-    this.playerMesh.position.copy(this.player.pos);
+    if(!floor)throw new Error('Stage restart floor is missing.');
+    this.#placePlayerOnFloor(floor);
   }
 
-  start(stage=0){this.#buildStage(stage,stage===0);this.playing=true;this.accumulator=0;this.clock.getDelta();}
+  start(stage=0){
+    if(stage===0){
+      if(!this.openingPrepared)this.#buildOpeningStage();
+      this.#releaseOpeningFloor();
+    }else this.#buildStage(stage,false);
+    this.playing=true;this.accumulator=0;this.clock.getDelta();
+  }
   pause(){this.playing=false;}
 
   #readGamepad(){
