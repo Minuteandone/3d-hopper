@@ -139,12 +139,25 @@ function readSkeleton(bytes,view,offset){
   return {offset,name:cstr(bytes,rel32(view,offset+0x0c)),boneCount,scalingRule:u32(view,offset+0x24),flags:u32(view,offset+0x28),bones};
 }
 
-function findMaterialTextureRefs(bytes,view,materialOffset){
-  const refs=[],end=Math.min(bytes.length-0x20,materialOffset+0x700);
-  for(let p=materialOffset;p<=end;p+=4){
-    if(u32(view,p)!==0x404||fourcc(bytes,p+4)!=='TXOB')continue;
-    const name=cstr(bytes,rel32(view,p+0x18));
-    if(name&&!refs.includes(name))refs.push(name);
+function readMaterialTextureRefs(bytes,view,materialOffset){
+  // Hopper's prototype MTOB (revision 0x04000000) stores three self-relative
+  // TexInfo pointers at +0x2B4/+0x2B8/+0x2BC. Each TexInfo is the early
+  // NintendoWare layout whose +0x08 field points to a reference TXOB.
+  checked(bytes,materialOffset,0x2c0,'MTOB');
+  if(fourcc(bytes,materialOffset+4)!=='MTOB')throw new Error(`MTOB missing at 0x${materialOffset.toString(16)}.`);
+  const refs=[];
+  for(const field of [0x2b4,0x2b8,0x2bc]){
+    const texInfo=rel32(view,materialOffset+field);
+    if(!texInfo)continue;
+    checked(bytes,texInfo,0x10,'prototype TexInfo');
+    const txob=rel32(view,texInfo+8);
+    if(!txob)continue;
+    checked(bytes,txob,0x1c,'reference TXOB');
+    if(u32(view,txob)!==0x404||fourcc(bytes,txob+4)!=='TXOB'){
+      throw new Error(`Material texture mapper at 0x${texInfo.toString(16)} does not reference a TXOB.`);
+    }
+    const name=cstr(bytes,rel32(view,txob+0x18));
+    if(name)refs.push(name);
   }
   return refs;
 }
@@ -157,7 +170,7 @@ function readModel(bytes,view,offset){
   for(let i=0;i<meshCount;i++)meshes.push(readMesh(bytes,view,rel32(view,meshArray+i*4)));
   for(let i=0;i<shapeCount;i++)shapes.push(readShape(bytes,view,rel32(view,shapeArray+i*4)));
   const materialEntries=materialDictOffset?parseDict(bytes,materialDictOffset):[];
-  const materials=materialEntries.slice(0,materialCount).map(entry=>({name:entry.name,offset:entry.offset,textureRefs:findMaterialTextureRefs(bytes,view,entry.offset)}));
+  const materials=materialEntries.slice(0,materialCount).map(entry=>({name:entry.name,offset:entry.offset,textureRefs:readMaterialTextureRefs(bytes,view,entry.offset)}));
   return {offset,name:cstr(bytes,rel32(view,offset+0x0c)),flags:u32(view,offset+0x18),
     scale:[f32(view,offset+0x30),f32(view,offset+0x34),f32(view,offset+0x38)],rotation:[f32(view,offset+0x3c),f32(view,offset+0x40),f32(view,offset+0x44)],translation:[f32(view,offset+0x48),f32(view,offset+0x4c),f32(view,offset+0x50)],
     localMatrix:matrix34(view,offset+0x54),worldMatrix:matrix34(view,offset+0x84),meshes,materials,shapes,skeleton:readSkeleton(bytes,view,skeletonOffset)};
