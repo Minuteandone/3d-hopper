@@ -1,0 +1,8 @@
+{
+  "name": "3d-hopper-web",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test:rom": "node tests/rom-test.mjs"
+  }
+}
