@@ -1,6 +1,6 @@
 import * as THREE from 'https://cdn.jsdelivr.net/npm/three@0.186.1/build/three.module.js';
 import { canvasFromTexture } from './cgfx.js';
-import { createModelInstance, disposeModelInstance } from './model-renderer.js';
+import { createModelInstance, disposeModelInstance, applySkeletalAnimation } from './model-renderer.js';
 import { gridCoordinate } from './executable.js';
 import {
   createGameState,activeStageRecords,createFloorRuntime,tickFloorRuntime,noteFall,findStartRecord,
@@ -18,8 +18,8 @@ function makeTexture(asset) {
 }
 
 export class HopperGame {
-  constructor(host,assets,models,program,callbacks={}) {
-    this.host=host;this.assets=assets;this.models=models;this.program=program;this.callbacks=callbacks;
+  constructor(host,assets,models,animations,program,callbacks={}) {
+    this.host=host;this.assets=assets;this.models=models;this.animations=animations;this.program=program;this.callbacks=callbacks;
     this.renderer=new THREE.WebGLRenderer({antialias:true,alpha:false,powerPreference:'high-performance'});
     this.renderer.setPixelRatio(Math.min(devicePixelRatio,2));
     this.renderer.shadowMap.enabled=true;this.renderer.shadowMap.type=THREE.PCFSoftShadowMap;
@@ -33,6 +33,7 @@ export class HopperGame {
     this.depth=.55;this.playing=false;this.elapsedFrames=0;
     this.state=createGameState(program);
     this.player={pos:new THREE.Vector3(),vel:new THREE.Vector3(),grounded:false};
+    this.playerAnimation=null;this.playerAnimFrame=0;this.playerAnimActive=false;
     this.platforms=[];this.particles=[];this.stageGroup=new THREE.Group();this.scene.add(this.stageGroup);
 
     this.#lights();this.#makeSky();this.#makePlayer();this.#events();
@@ -59,6 +60,10 @@ export class HopperGame {
     const group=createModelInstance(model,this.assets,{shadows:true});
     group.name='ROM neko_hopping_model';
     this.scene.add(group);this.playerMesh=group;
+    this.playerAnimation=this.animations.get('neko_hopping_jump')??null;
+    if(!this.playerAnimation)throw new Error('The ROM did not provide neko_hopping_jump.');
+    this.playerAnimFrame=Math.max(0,this.playerAnimation.frameCount-1);this.playerAnimActive=false;
+    applySkeletalAnimation(this.playerMesh,this.playerAnimation,this.playerAnimFrame,{loop:false});
   }
 
   #events(){
@@ -135,6 +140,8 @@ export class HopperGame {
     const center=floor?.center??start.position;
     this.player.pos.set(center[0],center[1]+this.program.physics.spawnClearance,center[2]);
     this.player.vel.set(0,0,0);this.player.grounded=false;this.state.currentFloorIndex=start.index;
+    this.playerAnimFrame=Math.max(0,this.playerAnimation.frameCount-1);this.playerAnimActive=false;
+    applySkeletalAnimation(this.playerMesh,this.playerAnimation,this.playerAnimFrame,{loop:false});
     this.playerMesh.position.copy(this.player.pos);
   }
 
@@ -190,6 +197,8 @@ export class HopperGame {
     this.player.vel.y=floor.velocity[1]+p.landingBouncePerFrame;
     this.player.pos.x+=floor.velocity[0];this.player.pos.z+=floor.velocity[2];
     this.player.grounded=true;this.state.currentFloorIndex=floor.index;
+    this.playerAnimFrame=0;this.playerAnimActive=true;
+    applySkeletalAnimation(this.playerMesh,this.playerAnimation,0,{loop:false});
     if(floor.record.type===3)this.#win();
   }
 
@@ -198,6 +207,15 @@ export class HopperGame {
     const rebuild=before!==this.state.stage2ExtraCounter;
     this.callbacks.onFalls?.(this.state.falls,{rescueCounter:this.state.stage2ExtraCounter,rebuild});
     if(rebuild)this.#buildStage(this.state.stageIndex,false,true);else this.#resetPlayer();
+  }
+
+  #updatePlayerAnimation(){
+    if(!this.playerAnimation)return;
+    if(this.playerAnimActive){
+      this.playerAnimFrame=Math.min(this.playerAnimation.frameCount-1,this.playerAnimFrame+1);
+      if(this.playerAnimFrame>=this.playerAnimation.frameCount-1)this.playerAnimActive=false;
+    }
+    applySkeletalAnimation(this.playerMesh,this.playerAnimation,this.playerAnimFrame,{loop:false});
   }
 
   #fixedTick(){
@@ -212,6 +230,7 @@ export class HopperGame {
     const floor=this.#landingFloor(previous,current);if(floor)this.#land(floor);
     if(this.player.pos.y<this.program.physics.failY)this.#fall();
     this.callbacks.onTime?.(this.elapsedFrames/this.program.physics.fixedHz);
+    this.#updatePlayerAnimation();
     // The original CMDL root is authored at the pogo contact point.
     this.playerMesh.position.copy(this.player.pos);
   }
