@@ -14,7 +14,7 @@ if(a.name!=='neko_hopping_jump'||a.frameCount!==48||a.tracks.length!==18)throw n
 let curves=0;
 for(const t of a.tracks)for(const g of [t.scale,t.rotation,t.translation])for(const v of g)if(v?.kind==='curve'){
   curves++;
-  if(v.curve.segments.length!==1||v.curve.segments[0].quantization!=='Hermite128')throw new Error('unexpected curve encoding');
+  if(v.curve.segments.length!==1||v.curve.segments[0].quantization!=='Hermite128'||v.curve.segments[0].interpolation!==2)throw new Error('unexpected curve encoding');
 }
 if(curves!==59)throw new Error(`expected 59 Hermite curves, got ${curves}`);
 const root=a.tracks.find(t=>t.path==='rootJt');
