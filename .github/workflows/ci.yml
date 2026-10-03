@@ -1,0 +1,26 @@
+name: Validate web port
+
+on:
+  push:
+    branches: ["main"]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  syntax:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version: "24"
+      - name: Check JavaScript syntax
+        run: |
+          node --check js/rom.js
+          node --check js/cgfx.js
+          node --check js/audio.js
+          node --check js/game.js
+          node --check js/main.js
+          node --check tests/rom-test.mjs
