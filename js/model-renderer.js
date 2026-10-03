@@ -27,14 +27,10 @@ function copyAttribute(geometry,name,attr,itemSize){
 }
 function copyPositionAttribute(geometry,shape){
   const attr=shape.byUsage.get(VertexUsage.Position);if(!attr)return;
-  const values=new Float32Array(attr.values);
-  const [ox,oy,oz]=shape.positionOffset;
-  for(let i=0;i<attr.count;i++){
-    values[i*attr.components]+=ox;
-    if(attr.components>1)values[i*attr.components+1]+=oy;
-    if(attr.components>2)values[i*attr.components+2]+=oz;
-  }
-  geometry.setAttribute('position',new THREE.BufferAttribute(values,3));
+  // Shape.PositionOffset is a shape/object transform in CGFX, not part of the
+  // skinned vertex stream. Applying it here would make bone transforms rotate
+  // and scale the offset itself.
+  geometry.setAttribute('position',new THREE.BufferAttribute(new Float32Array(attr.values),3));
 }
 function skinAttributes(shape,primitiveSet,bones){
   if(!bones)return null;
@@ -81,6 +77,7 @@ export function createModelInstance(model,textures,{shadows=true}={}){
       const object=bones?new THREE.SkinnedMesh(geometry,material):new THREE.Mesh(geometry,material);
       object.name=meshInfo.name||`${model.name}_mesh`;object.castShadow=shadows;object.receiveShadow=shadows;
       if(bones)object.bind(bones.skeleton,new THREE.Matrix4());
+      object.position.set(shape.positionOffset[0],shape.positionOffset[1],shape.positionOffset[2]);
       group.add(object);
     }
   }
