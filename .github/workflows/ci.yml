@@ -27,6 +27,7 @@ jobs:
           node --check js/luts.js
           node --check js/fragment-lighting.js
           node --check js/texenv.js
+          node --check js/pica-material.js
           node --check js/model-renderer.js
           node --check js/animation.js
           node --check js/emitters.js
