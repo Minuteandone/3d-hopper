@@ -33,7 +33,8 @@ function makeMaterial(material,textures){
     transparent:alphaBlend,
     alphaTest:0,
     side,
-    depthWrite:true,
+    depthTest:material?.depth?.testEnabled??true,
+    depthWrite:material?.depth?.writeEnabled??true,
   });
 }
 function buildBones(model,group){
