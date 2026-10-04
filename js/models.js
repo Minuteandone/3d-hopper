@@ -178,6 +178,38 @@ function readMaterialTextureMappers(bytes,view,materialOffset){
   return mappers;
 }
 
+function readTextureCoordinator(bytes,view,offset,hashOffset){
+  checked(bytes,offset,0x58,'prototype texture coordinator');
+  const matrix=new Float32Array(12);
+  for(let i=0;i<12;i++)matrix[i]=f32(view,offset+0x28+i*4);
+  return {
+    offset,
+    sourceCoordinate:u32(view,offset),
+    mappingMethod:u32(view,offset+4),
+    referenceCamera:s32(view,offset+8),
+    matrixMode:u32(view,offset+0x0c),
+    scale:[f32(view,offset+0x10),f32(view,offset+0x14)],
+    rotate:f32(view,offset+0x18),
+    translate:[f32(view,offset+0x1c),f32(view,offset+0x20)],
+    flags:u32(view,offset+0x24),
+    matrix,
+    hash:u32(view,hashOffset),
+  };
+}
+
+function readTextureCoordinators(bytes,view,materialOffset){
+  return [
+    readTextureCoordinator(bytes,view,materialOffset+0x1a0,materialOffset+0x1f8),
+    readTextureCoordinator(bytes,view,materialOffset+0x1fc,materialOffset+0x254),
+    readTextureCoordinator(bytes,view,materialOffset+0x258,materialOffset+0x2b0),
+  ];
+}
+
+export function textureCoordinateIndexForMapper(texCoordConfig,mapperIndex){
+  if(mapperIndex===2&&(texCoordConfig===1||texCoordConfig===2||texCoordConfig===3))return 1;
+  return mapperIndex;
+}
+
 function readFragmentShaderState(bytes,view,materialOffset){
   const offset=rel32(view,materialOffset+0x2c8);
   if(!offset)return null;
@@ -266,13 +298,20 @@ function readModel(bytes,view,offset){
     const blendEnabled=((blendCommand1>>>8)&0xff)===1;
     const colorSource=(blendCommand3>>>16)&0xf;
     const colorDestination=(blendCommand3>>>20)&0xf;
+    const texCoordConfig=u32(view,o+0x1c);
+    const textureCoordinators=readTextureCoordinators(bytes,view,o);
     const textureMappers=readMaterialTextureMappers(bytes,view,o);
     const textureRefs=textureMappers.map(m=>m.textureName);
     const fragmentShader=readFragmentShaderState(bytes,view,o);
+    const visibleColorMapper=firstColorTextureMapper(fragmentShader);
+    const visibleTextureCoordinate=Number.isInteger(visibleColorMapper)
+      ?textureCoordinators[textureCoordinateIndexForMapper(texCoordConfig,visibleColorMapper)]??null
+      :null;
     return {
       name:entry.name,offset:o,revision,
+      texCoordConfig,textureCoordinators,
       textureMappers,textureRefs,
-      visibleColorMapper:firstColorTextureMapper(fragmentShader),
+      visibleColorMapper,visibleTextureCoordinate,
       rasterization:{cullMode,commandParam:cullCommandParam,commandHeader:cullCommandHeader},
       depth:{
         flags:depthFlags,
