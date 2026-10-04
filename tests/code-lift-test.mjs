@@ -32,6 +32,20 @@ if(p.ending.starShowerEffectSlot!==5||p.ending.starShowerY!==65||p.ending.thanks
 eq(p.ending.frame60Controller,[24,24,47,.5],'ending frame-60 controller values');
 if(p.ending.followYLimit!==61||!close(p.ending.followYLerp,.15))throw new Error('ending follow-camera constants mismatch');
 if(!close(p.viewController.followYLerp,.15))throw new Error('normal view follow lerp mismatch');
+eq(p.viewController.stageSetup.map(v=>[
+  v.projection.fovDegrees,v.projection.near,v.projection.far,
+  v.projection.frustumParameter0,v.projection.frustumParameter1,
+  ...v.orientationDegrees,...v.auxiliaryPair
+]),[
+  [15,10,300,.5,.75,65,-40,0,62.5,2.5],
+  [20,10,300,.5,.75,60,-20,0,50,2],
+  [20,10,300,.5,.7,60,-50,25,60,2],
+  [15,10,300,.5,.75,65,-40,0,65,2],
+],'stage view-controller setup');
+eq(p.viewController.selectors,[1024,1040,0x401],'view selectors');
+eq(p.viewController.projectionOffsets,[136,200,264],'projection matrix offsets');
+eq(p.viewController.viewOffsets,[328,376,424],'view matrix offsets');
+eq(p.viewController.inverseViewOffsets,[472,520,568],'inverse-view matrix offsets');
 
 if(!close(p.controls.degreesToTrigUnits,.7111111283))throw new Error('control degree conversion mismatch');
 eq(p.controls.stageSetup.map(s=>s.orientation),[[65,-40,0],[60,-20,0],[60,-50,25],[65,-40,0]],'stage orientation setup');
