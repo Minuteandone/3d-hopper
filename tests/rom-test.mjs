@@ -100,6 +100,18 @@ if(hopLighting?.flags!==0x0a||hopLighting.layerConfig!==0||hopLighting.fresnelCo
 if(nekoLighting?.flags!==0x17||nekoLighting.layerConfig!==3||nekoLighting.fresnelConfig!==0||
    nekoLighting.bumpTextureIndex!==0||nekoLighting.bumpMode!==1||!nekoLighting.bumpRenormalize)throw new Error('nekopper fragment-lighting config mismatch');
 
+
+const hopTable=hoppingMat.fragmentShader?.fragmentLightingTable;
+const nekoTable=nekopperMat.fragmentShader?.fragmentLightingTable;
+if(hopTable?.distribution0?.inputCommand!==0||hopTable.distribution0.scaleCommand!==0||
+   hopTable.distribution0.sampler?.type!==2||hopTable.distribution0.sampler.resourceName!=='hopping_Lut'||
+   hopTable.distribution0.sampler.tableName!=='D0')throw new Error('hopping Distribution0 LUT reference mismatch');
+if(hopTable?.distribution1||hopTable?.reflectanceR||hopTable?.reflectanceG||hopTable?.reflectanceB||hopTable?.fresnel)throw new Error('hopping has unexpected extra lighting LUTs');
+if(nekoTable?.distribution0?.inputCommand!==3||nekoTable.distribution0.scaleCommand!==1||
+   nekoTable.distribution0.sampler?.resourceName!=='nekopperLut'||nekoTable.distribution0.sampler.tableName!=='LookupTable_1')throw new Error('nekopper Distribution0 LUT reference mismatch');
+if(nekoTable?.distribution1?.inputCommand!==2||nekoTable.distribution1.scaleCommand!==0||
+   nekoTable.distribution1.sampler?.resourceName!=='nekopperLut'||nekoTable.distribution1.sampler.tableName!=='LookupTable_2')throw new Error('nekopper Distribution1 LUT reference mismatch');
+
 const hoppingStage0=hoppingMat.fragmentShader?.stages?.[0];
 if(hoppingStage0?.colorMode!==3||hoppingStage0?.alphaMode!==1||
    JSON.stringify(hoppingStage0.colorSources.slice(0,2))!=='[1,3]'||
