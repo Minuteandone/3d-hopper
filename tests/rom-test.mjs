@@ -60,6 +60,7 @@ const closeColor=(actual,expected,label)=>{
   for(let i=0;i<expected.length;i++)if(Math.abs(actual[i]-expected[i])>1e-5)throw new Error(`${label}[${i}] ${actual[i]} != ${expected[i]}`);
 };
 if(cat.materials[0]?.flags!==1||cat.materials[1]?.flags!==1)throw new Error('cat materials must have fragment lighting enabled');
+if(cat.materials[0]?.lightSetIndex!==1||cat.materials[1]?.lightSetIndex!==1)throw new Error('cat materials must use light set 1');
 closeColor(cat.materials[0].materialColor.emission,[0,0,0,0],'hopping emission');
 closeColor(cat.materials[0].materialColor.ambient,[1,1,1,1],'hopping ambient');
 closeColor(cat.materials[0].materialColor.diffuse,[1,.67,.67,1],'hopping diffuse');
@@ -128,6 +129,7 @@ const floor1=parseModels(rom.get('gfx/hopper_map_floor01.bcmdl')).find(m=>m.name
 const floor2=parseModels(rom.get('gfx/hopper_map_floor02.bcmdl')).find(m=>m.name==='hopper_floor02_model');
 for(const floor of [floor1,floor2]){
   if(!floor)throw new Error('floor model missing');
+  if(floor.materials[0]?.lightSetIndex!==1)throw new Error(`${floor.name}: expected light set 1`);
   if(floor.materials[0]?.rasterization?.cullMode!==2)throw new Error(`${floor.name}: expected back-face culling`);
   if(floor.materials[0]?.depth?.flags!==3||!floor.materials[0].depth.testEnabled||!floor.materials[0].depth.writeEnabled||floor.materials[0].depth.compareCode!==4)throw new Error(`${floor.name}: floor depth state mismatch`);
   const blend=floor.materials[0]?.blend;
