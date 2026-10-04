@@ -2,6 +2,7 @@ import * as THREE from 'https://cdn.jsdelivr.net/npm/three@0.186.1/build/three.m
 import { canvasFromTexture } from './cgfx.js';
 import { VertexUsage } from './models.js';
 import { sampleTransformTrack } from './animation.js';
+import { canUseLivePicaMaterial, makeLivePicaMaterial } from './pica-material.js';
 
 function matrix4From34(m){const out=new THREE.Matrix4();out.set(m[0],m[1],m[2],m[3],m[4],m[5],m[6],m[7],m[8],m[9],m[10],m[11],0,0,0,1);return out;}
 function wrapModeToThree(mode){
@@ -44,6 +45,7 @@ function depthFuncToThree(code){
   ][code]??THREE.LessEqualDepth;
 }
 function makeMaterial(material,textures,renderResources=null){
+  if(canUseLivePicaMaterial(material,renderResources))return makeLivePicaMaterial(material,textures,renderResources);
   const mapperIndex=Number.isInteger(material?.visibleColorMapper)?material.visibleColorMapper:0;
   const mapper=material?.textureMappers?.[mapperIndex]??material?.textureMappers?.[0]??null;
   const textureName=mapper?.textureName??material?.textureRefs?.[mapperIndex]??material?.textureRefs?.[0]??null;
@@ -220,6 +222,14 @@ export function applySkeletalAnimation(root,animation,frame,{loop=true}={}){
 }
 
 export function disposeModelInstance(root){
-  const materials=new Set();root.traverse(obj=>{obj.geometry?.dispose?.();for(const mat of (Array.isArray(obj.material)?obj.material:[obj.material]))if(mat){materials.add(mat);mat.map?.dispose?.();}});
-  for(const mat of materials)mat.dispose?.();
+  const materials=new Set();
+  root.traverse(obj=>{
+    obj.geometry?.dispose?.();
+    for(const mat of (Array.isArray(obj.material)?obj.material:[obj.material]))if(mat)materials.add(mat);
+  });
+  for(const mat of materials){
+    mat.map?.dispose?.();
+    for(const tex of mat.userData?.hopperOwnedTextures??[])tex?.dispose?.();
+    mat.dispose?.();
+  }
 }
