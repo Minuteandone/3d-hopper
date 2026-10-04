@@ -28,19 +28,40 @@ function buildBones(model,group){
   const jointToIndex=new Map(source.map((src,i)=>[src.jointId,i]));
   source.forEach((src,i)=>{const parentIndex=jointToIndex.get(src.parentId);if(parentIndex===undefined)group.add(bones[i]);else bones[parentIndex].add(bones[i]);});
   group.updateMatrixWorld(true);
-  const skeleton=new THREE.Skeleton(bones);skeleton.calculateInverses();
+  const boneInverses=source.map(src=>matrix4From34(src.inverseBaseMatrix));
+  const skeleton=new THREE.Skeleton(bones,boneInverses);
   return {skeleton,jointToIndex,bones,source};
 }
 function copyAttribute(geometry,name,attr,itemSize){
   if(!attr)return;
   geometry.setAttribute(name,new THREE.BufferAttribute(new Float32Array(attr.values),itemSize));
 }
-function copyPositionAttribute(geometry,shape){
+function copyPositionAttribute(geometry,shape,primitiveSet,bones){
   const attr=shape.byUsage.get(VertexUsage.Position);if(!attr)return;
-  // Shape.PositionOffset is a shape/object transform in CGFX, not part of the
-  // skinned vertex stream. Applying it here would make bone transforms rotate
-  // and scale the offset itself.
-  geometry.setAttribute('position',new THREE.BufferAttribute(new Float32Array(attr.values),3));
+  const values=new Float32Array(attr.count*3);
+  const [ox,oy,oz]=shape.positionOffset;
+  let bindWorld=null;
+  if(bones&&primitiveSet.skinningMode!==2&&primitiveSet.relatedBones.length){
+    const jointId=primitiveSet.relatedBones[0];
+    const boneIndex=bones.jointToIndex.get(jointId);
+    if(boneIndex!==undefined){
+      // Non-smooth CGFX pieces are authored in the related bone's local bind
+      // space. Bake that bind transform into model space before applying the
+      // runtime inverse-bind animation delta.
+      bindWorld=matrix4From34(bones.source[boneIndex].inverseBaseMatrix).invert();
+    }
+  }
+  const v=new THREE.Vector3();
+  for(let i=0;i<attr.count;i++){
+    v.set(
+      attr.values[i*attr.components]+ox,
+      (attr.components>1?attr.values[i*attr.components+1]:0)+oy,
+      (attr.components>2?attr.values[i*attr.components+2]:0)+oz
+    );
+    if(bindWorld)v.applyMatrix4(bindWorld);
+    values[i*3]=v.x;values[i*3+1]=v.y;values[i*3+2]=v.z;
+  }
+  geometry.setAttribute('position',new THREE.BufferAttribute(values,3));
 }
 function skinAttributes(shape,primitiveSet,bones){
   if(!bones)return null;
@@ -62,7 +83,7 @@ function skinAttributes(shape,primitiveSet,bones){
 }
 function makeGeometry(shape,primitiveSet,indexStream,bones){
   const geometry=new THREE.BufferGeometry();
-  copyPositionAttribute(geometry,shape);
+  copyPositionAttribute(geometry,shape,primitiveSet,bones);
   copyAttribute(geometry,'normal',shape.byUsage.get(VertexUsage.Normal),3);
   copyAttribute(geometry,'uv',shape.byUsage.get(VertexUsage.TextureCoordinate0),2);
   const skin=skinAttributes(shape,primitiveSet,bones);
@@ -84,10 +105,10 @@ export function createModelInstance(model,textures,{shadows=true}={}){
     for(const primitiveSet of shape.primitiveSets)for(const primitive of primitiveSet.primitives)for(const stream of primitive.indexStreams){
       if(stream.indices.length<3)continue;
       const geometry=makeGeometry(shape,primitiveSet,stream,bones);
-      const object=bones?new THREE.SkinnedMesh(geometry,material):new THREE.Mesh(geometry,material);
+      const skinned=!!geometry.getAttribute('skinIndex');
+      const object=skinned?new THREE.SkinnedMesh(geometry,material):new THREE.Mesh(geometry,material);
       object.name=meshInfo.name||`${model.name}_mesh`;object.castShadow=shadows;object.receiveShadow=shadows;
-      if(bones)object.bind(bones.skeleton,new THREE.Matrix4());
-      object.position.set(shape.positionOffset[0],shape.positionOffset[1],shape.positionOffset[2]);
+      if(skinned)object.bind(bones.skeleton,new THREE.Matrix4());
       group.add(object);
     }
   }
