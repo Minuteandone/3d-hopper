@@ -147,6 +147,7 @@ function makeGeometry(shape,primitiveSet,indexStream,bones){
   const geometry=new THREE.BufferGeometry();
   copyPositionAttribute(geometry,shape,primitiveSet,bones);
   copyNormalAttribute(geometry,shape,primitiveSet,bones);
+  copyAttribute(geometry,'color',shape.byUsage.get(VertexUsage.Color),4);
   copyAttribute(geometry,'uv',shape.byUsage.get(VertexUsage.TextureCoordinate0),2);
   copyAttribute(geometry,'uv1',shape.byUsage.get(VertexUsage.TextureCoordinate1),2);
   copyAttribute(geometry,'uv2',shape.byUsage.get(VertexUsage.TextureCoordinate2),2);
