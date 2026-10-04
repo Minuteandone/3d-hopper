@@ -92,6 +92,10 @@ if(hopMapper?.textureName!=='hopping'||hopMapper.config!==0x2206||hopMapper.wrap
 const nekoMapper=cat.materials[1]?.textureMappers?.[1];
 if(nekoMapper?.textureName!=='nekopper'||nekoMapper.config!==0x2200||nekoMapper.wrapS!==2||nekoMapper.wrapT!==2||nekoMapper.minFilter!==0||nekoMapper.magFilter!==0)throw new Error('nekopper sampler state mismatch');
 const hoppingMat=cat.materials[0],nekopperMat=cat.materials[1];
+for(const mat of [hoppingMat,nekopperMat]){
+  if(mat.shader?.linkedShaderName!=='DefaultShader'||mat.shaderProgramDescriptionIndex!==0)
+    throw new Error(`${mat.name} SHDR linkage mismatch`);
+}
 if(hoppingMat.visibleColorMapper!==0||nekopperMat.visibleColorMapper!==1)throw new Error('cat visible color mapper must come from TexEnv');
 if(hoppingMat.texCoordConfig!==0||nekopperMat.texCoordConfig!==3)throw new Error('cat texture-coordinate config mismatch');
 const hopCoord=hoppingMat.visibleTextureCoordinate,nekoCoord=nekopperMat.visibleTextureCoordinate;
