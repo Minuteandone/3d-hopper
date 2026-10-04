@@ -284,12 +284,22 @@ function readFragmentShaderState(bytes,view,materialOffset){
     const constantColor=u32(view,o+0x14);
     const scale=u32(view,o+0x18);
     if(address!==expectedHeaders[i])throw new Error(`Unexpected Hopper TexEnv stage ${i} command 0x${address.toString(16)}.`);
+    const colorScaleCode=scale&3,alphaScaleCode=(scale>>>16)&3;
     stages.push({
       index:i,constant,source,address,operands,combine,constantColor,scale,
       colorSources:[source&0xf,(source>>>4)&0xf,(source>>>8)&0xf],
       alphaSources:[(source>>>16)&0xf,(source>>>20)&0xf,(source>>>24)&0xf],
+      colorModifiers:[operands&0xf,(operands>>>4)&0xf,(operands>>>8)&0xf],
+      alphaModifiers:[(operands>>>12)&7,(operands>>>16)&7,(operands>>>20)&7],
       colorMode:combine&0xf,
       alphaMode:(combine>>>16)&0xf,
+      constantRgba:[
+        constantColor&0xff,(constantColor>>>8)&0xff,
+        (constantColor>>>16)&0xff,(constantColor>>>24)&0xff,
+      ],
+      colorScaleCode,alphaScaleCode,
+      colorMultiplier:colorScaleCode<3?(1<<colorScaleCode):1,
+      alphaMultiplier:alphaScaleCode<3?(1<<alphaScaleCode):1,
     });
   }
 
