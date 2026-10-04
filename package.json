@@ -10,6 +10,7 @@
     "test:emitters": "node tests/emitters-test.mjs",
     "test:effects": "node tests/effects-test.mjs",
     "test:bcsar": "node tests/bcsar-test.mjs",
-    "test:lighting": "node tests/fragment-lighting-test.mjs"
+    "test:lighting": "node tests/fragment-lighting-test.mjs",
+    "test:texenv": "node tests/texenv-test.mjs"
   }
 }
