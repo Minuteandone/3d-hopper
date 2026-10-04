@@ -2,7 +2,7 @@ import * as THREE from 'https://cdn.jsdelivr.net/npm/three@0.186.1/build/three.m
 import { createModelInstance, disposeModelInstance } from './model-renderer.js';
 import { gridCoordinate, transformControlVector } from './executable.js';
 import {
-  createGameState,activeStageRecords,createFloorRuntime,tickFloorRuntime,noteFall,findStartRecord,updateHorizontalVelocity,intersectFloorTop,intersectFloorBottom,
+  createGameState,activeStageRecords,createFloorRuntime,tickFloorRuntime,noteFall,findStartRecord,updateHorizontalVelocity,intersectFloorTop,intersectFloorBottom,createEndingRuntime,tickEndingRuntime,
 } from './runtime.js';
 
 const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
@@ -21,8 +21,8 @@ export class HopperGame {
     // Browser host cadence only. The original executable has per-update constants,
     // but this port has not yet proven the game's scheduler frequency.
     this.fixedStep=1/60;
-    this.input={left:false,right:false,up:false,down:false};this.gamepad={x:0,y:0};
-    this.playing=false;this.elapsedFrames=0;this.phase=0;
+    this.input={left:false,right:false,up:false,down:false,confirm:false};this.gamepad={x:0,y:0,confirm:false};
+    this.playing=false;this.elapsedFrames=0;this.phase=0;this.endingRuntime=null;
     this.state=createGameState(program);
     this.player={pos:new THREE.Vector3(),vel:new THREE.Vector3(),grounded:false};
     this.platforms=[];this.stageGroup=new THREE.Group();this.scene.add(this.stageGroup);
@@ -56,8 +56,15 @@ export class HopperGame {
 
   #events(){
     const map={ArrowLeft:'left',KeyA:'left',ArrowRight:'right',KeyD:'right',ArrowUp:'up',KeyW:'up',ArrowDown:'down',KeyS:'down'};
-    addEventListener('keydown',e=>{if(map[e.code]){this.input[map[e.code]]=true;e.preventDefault();}});
-    addEventListener('keyup',e=>{if(map[e.code]){this.input[map[e.code]]=false;e.preventDefault();}});
+    const confirmCodes=new Set(['Enter','Space','KeyZ']);
+    addEventListener('keydown',e=>{
+      if(map[e.code]){this.input[map[e.code]]=true;e.preventDefault();}
+      if(confirmCodes.has(e.code)){this.input.confirm=true;e.preventDefault();}
+    });
+    addEventListener('keyup',e=>{
+      if(map[e.code]){this.input[map[e.code]]=false;e.preventDefault();}
+      if(confirmCodes.has(e.code)){this.input.confirm=false;e.preventDefault();}
+    });
   }
 
   bindTouch(root){
@@ -161,8 +168,9 @@ export class HopperGame {
   pause(){this.playing=false;}
 
   #readGamepad(){
-    const gp=navigator.getGamepads?.()?.find(Boolean);if(!gp){this.gamepad.x=this.gamepad.y=0;return;}
+    const gp=navigator.getGamepads?.()?.find(Boolean);if(!gp){this.gamepad.x=this.gamepad.y=0;this.gamepad.confirm=false;return;}
     this.gamepad.x=Math.abs(gp.axes[0]||0)>.18?(gp.axes[0]||0):0;this.gamepad.y=Math.abs(gp.axes[1]||0)>.18?(gp.axes[1]||0):0;
+    this.gamepad.confirm=!!gp.buttons?.[0]?.pressed;
   }
 
   #inputVector(){
@@ -199,8 +207,10 @@ export class HopperGame {
     this.player.grounded=true;this.state.currentFloorIndex=floor.index;
     if(floor.record.type===3){
       if(this.state.stageIndex===this.program.stages.length-1){
-        this.phase=3;
-        this.#win(); // final state-3 sequence is still a browser placeholder
+        // Final-stage goal path enters dedicated state 3. 0x13B74C resets
+        // its two counters before 0x13E630 takes over on following updates.
+        this.phase=3;this.endingRuntime=createEndingRuntime();
+        this.callbacks.onEndingStart?.({stage:4});
       }else{
         // Goal collision path 0x13D144..0x13D19C: ordinary stages enter
         // state 2 and continue the bounce instead of stopping immediately.
@@ -219,7 +229,25 @@ export class HopperGame {
   #fixedTick(){
     if(!this.playing)return;
     this.elapsedFrames++;
-    this.#readGamepad();this.#updateFloors();
+    this.#readGamepad();
+
+    if(this.phase===3){
+      const tick=tickEndingRuntime(this.endingRuntime,this.program.ending,{confirm:this.input.confirm||this.gamepad.confirm});
+      this.player.pos.y+=tick.riseY;
+      this.playerMesh.position.copy(this.player.pos);
+      for(const event of tick.events)this.callbacks.onEndingEvent?.(event);
+      if(tick.state===5){
+        this.phase=5;this.playing=false;
+        // The native outer update asks the global fade controller for a
+        // 30-step transition before switching to the literal Thanks scene.
+        // That global fade controller is not translated yet, so expose the
+        // scene transition now rather than inventing a local timer.
+        this.callbacks.onThanks?.({scene:this.program.ending.thanksSceneName,fadeArgument:this.program.ending.state5FadeArgument});
+      }
+      return;
+    }
+
+    this.#updateFloors();
 
     // 0x13CAD4..0x13CB40: state 2 advances to the next descriptor stage as
     // the upward velocity reaches its apex window.
@@ -276,12 +304,6 @@ export class HopperGame {
     this.callbacks.onTime?.(this.elapsedFrames/60);
     // The original CMDL root is authored at the pogo contact point.
     this.playerMesh.position.copy(this.player.pos);
-  }
-
-  #win(){
-    if(!this.playing)return;this.playing=false;
-    const final=this.state.stageIndex===this.program.stages.length-1;
-    this.callbacks.onWin?.({stage:this.state.stageIndex+1,stageIndex:this.state.stageIndex,time:this.elapsedFrames/60,falls:this.state.falls,final,rescueCounter:this.state.stage2ExtraCounter});
   }
 
   #camera(snap=false){
