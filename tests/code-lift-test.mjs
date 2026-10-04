@@ -27,6 +27,11 @@ const mover=p.stages[3].records[1];
 const quarter=movingFloorAt(mover,179);
 if(!close(quarter.position[0],0)||!close(quarter.position[2],-8))throw new Error(`moving-floor sine mismatch: ${quarter.position}`);
 if(p.initialState.stage2ExtraCounter!==2)throw new Error('game constructor state mismatch');
+if(!close(p.ending.risePerUpdate,.42)||p.ending.introUpdates!==60||p.ending.starShowerUpdate!==240||p.ending.postShowerTimeoutUpdates!==600)throw new Error('ending timeline constants mismatch');
+if(p.ending.starShowerEffectSlot!==5||p.ending.starShowerY!==65||p.ending.thanksSceneName!=='Thanks'||p.ending.state5FadeArgument!==30)throw new Error('ending resource/scene mapping mismatch');
+eq(p.ending.frame60Controller,[24,24,47,.5],'ending frame-60 controller values');
+if(p.ending.followYLimit!==61||!close(p.ending.followYLerp,.15))throw new Error('ending follow-camera constants mismatch');
+
 if(!close(p.controls.degreesToTrigUnits,.7111111283))throw new Error('control degree conversion mismatch');
 eq(p.controls.stageSetup.map(s=>s.orientation),[[65,-40,0],[60,-20,0],[60,-50,25],[65,-40,0]],'stage orientation setup');
 const right3=transformControlVector(p.controls,2,1,0);
