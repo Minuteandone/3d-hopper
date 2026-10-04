@@ -25,6 +25,7 @@ jobs:
           node --check js/models.js
           node --check js/lights.js
           node --check js/luts.js
+          node --check js/fragment-lighting.js
           node --check js/model-renderer.js
           node --check js/animation.js
           node --check js/emitters.js
@@ -37,7 +38,11 @@ jobs:
           node --check tests/animation-test.mjs
           node --check tests/emitters-test.mjs
           node --check tests/effects-test.mjs
+          node --check tests/fragment-lighting-test.mjs
 
           node --check tests/code-lift-test.mjs
           node --check tests/runtime-test.mjs
           node --check tests/bcsar-test.mjs
+      - name: Run ROM-free unit tests
+        run: |
+          node tests/fragment-lighting-test.mjs
