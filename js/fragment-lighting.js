@@ -129,3 +129,27 @@ export const FragmentLightingFlags=Object.freeze({
   GeometricFactor1:FLAG_GEOMETRIC1,
   Reflection:FLAG_REFLECTION,
 });
+
+/**
+ * Translate NintendoWare's bump/tangent setup used before fragment lighting.
+ * textureSample is an RGBA-like array in normalized 0..1 texture space.
+ */
+export function decodeBumpSurface(fragmentLighting,textureSample=[.5,.5,1,1]){
+  let normal=[0,0,1],tangent=[1,0,0];
+  const bump=[
+    textureSample[0]*2-1,
+    textureSample[1]*2-1,
+    textureSample[2]*2-1,
+  ];
+  if(fragmentLighting.bumpMode===1)normal=bump;
+  else if(fragmentLighting.bumpMode===2)tangent=bump;
+
+  if(fragmentLighting.bumpRenormalize){
+    normal=[
+      normal[0],
+      normal[1],
+      Math.sqrt(Math.max(1-normal[0]*normal[0]-normal[1]*normal[1],0)),
+    ];
+  }
+  return {normal,tangent};
+}
