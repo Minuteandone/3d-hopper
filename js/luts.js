@@ -68,7 +68,7 @@ export function parsePrototypeLuts(input){
     const name=cstr(bytes,rel32(view,o+0x0c));
     const count=u32(view,o+0x18),dict=rel32(view,o+0x1c);
     const tables=parseDict(bytes,dict).slice(0,count).map(t=>parsePrototypeLutSampler(bytes,t.offset));
-    map.set(entry.name||name,{offset:o,revision,name:entry.name||name,tables,new Map:undefined});
+    map.set(entry.name||name,{offset:o,revision,name:entry.name||name,tables});
   }
   // Keep return values simple/serializable while also offering name lookup.
   return [...map.values()].map(lut=>({
