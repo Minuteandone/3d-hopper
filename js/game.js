@@ -1,13 +1,13 @@
 import * as THREE from 'https://cdn.jsdelivr.net/npm/three@0.186.1/build/three.module.js';
-import { createModelInstance, disposeModelInstance } from './model-renderer.js';
+import { createModelInstance, disposeModelInstance, applySkeletalAnimation } from './model-renderer.js';
 import { gridCoordinate, transformControlVector, computeCenterCameraPose } from './executable.js';
 import {
-  createGameState,activeStageRecords,createFloorRuntime,tickFloorRuntime,noteFall,findStartRecord,updateHorizontalVelocity,intersectFloorTop,intersectFloorBottom,createEndingRuntime,tickEndingRuntime,applyLowerSideCollision,updateUpperCollisionPoint,updateViewTarget,
+  createGameState,activeStageRecords,createFloorRuntime,tickFloorRuntime,noteFall,findStartRecord,updateHorizontalVelocity,intersectFloorTop,intersectFloorBottom,createEndingRuntime,tickEndingRuntime,applyLowerSideCollision,updateUpperCollisionPoint,updateViewTarget,createAnimationSlot,retimeAnimationSlot,tickAnimationSlot,
 } from './runtime.js';
 
 export class HopperGame {
-  constructor(host,assets,models,program,callbacks={}) {
-    this.host=host;this.assets=assets;this.models=models;this.program=program;this.callbacks=callbacks;
+  constructor(host,assets,models,animations,program,callbacks={}) {
+    this.host=host;this.assets=assets;this.models=models;this.animations=animations;this.program=program;this.callbacks=callbacks;
     this.renderer=new THREE.WebGLRenderer({antialias:true,alpha:false,powerPreference:'high-performance'});
     this.renderer.setPixelRatio(Math.min(devicePixelRatio,2));
     this.renderer.shadowMap.enabled=true;this.renderer.shadowMap.type=THREE.PCFSoftShadowMap;
@@ -25,6 +25,12 @@ export class HopperGame {
     this.state=createGameState(program);
     this.player={pos:new THREE.Vector3(),upper:new THREE.Vector3(),vel:new THREE.Vector3(),grounded:false};
     this.platforms=[];this.stageGroup=new THREE.Group();this.scene.add(this.stageGroup);
+    this.catAnimation=this.animations.get('neko_hopping_jump');
+    if(!this.catAnimation)throw new Error('The ROM did not provide neko_hopping_jump.');
+    this.catAnimationSlot=createAnimationSlot(
+      this.program.catAnimation.stageSetup,
+      {loop:this.catAnimation.loopMode!==0}
+    );
 
     this.#lights();this.#makeSky();this.#makePlayer();this.#events();
     this.resize();new ResizeObserver(()=>this.resize()).observe(host);
@@ -51,6 +57,7 @@ export class HopperGame {
     const group=createModelInstance(model,this.assets,{shadows:true});
     group.name='ROM neko_hopping_model';
     this.scene.add(group);this.playerMesh=group;
+    applySkeletalAnimation(this.playerMesh,this.catAnimation,this.catAnimationSlot.current,{loop:false});
   }
 
   #events(){
@@ -105,6 +112,17 @@ export class HopperGame {
     return runtime;
   }
 
+  #retimeCatAnimation(config){
+    retimeAnimationSlot(this.catAnimationSlot,config);
+    applySkeletalAnimation(this.playerMesh,this.catAnimation,this.catAnimationSlot.current,{loop:false});
+  }
+
+  #tickCatAnimation(){
+    const frame=tickAnimationSlot(this.catAnimationSlot);
+    applySkeletalAnimation(this.playerMesh,this.catAnimation,frame,{loop:false});
+    return frame;
+  }
+
   #placePlayerOnFloor(floor){
     const center=floor.center;
     this.player.pos.set(center[0],center[1]+this.program.physics.spawnClearance,center[2]);
@@ -114,6 +132,7 @@ export class HopperGame {
       this.player.pos.z
     );
     this.player.vel.set(0,0,0);this.player.grounded=false;this.state.currentFloorIndex=floor.index;
+    this.#retimeCatAnimation(this.program.catAnimation.stageSetup);
     this.playerMesh.position.copy(this.player.pos);
   }
 
@@ -213,6 +232,7 @@ export class HopperGame {
     const p=this.program.physics;
     this.player.vel.y=floor.velocity[1]+p.landingBouncePerUpdate;
     this.player.grounded=true;this.state.currentFloorIndex=floor.index;
+    this.#retimeCatAnimation(this.program.catAnimation.landing);
     if(floor.record.type===3){
       if(this.state.stageIndex===this.program.stages.length-1){
         // Final-stage goal path enters dedicated state 3. 0x13B74C resets
@@ -244,7 +264,11 @@ export class HopperGame {
       this.player.pos.y+=tick.riseY;
       this.player.upper.y+=tick.riseY;
       this.playerMesh.position.copy(this.player.pos);
-      for(const event of tick.events)this.callbacks.onEndingEvent?.(event);
+      for(const event of tick.events){
+        if(event.type==='frame60-controller')this.#retimeCatAnimation(this.program.catAnimation.endingFrame60);
+        this.callbacks.onEndingEvent?.(event);
+      }
+      this.#tickCatAnimation();
       if(tick.state===5){
         this.phase=5;this.playing=false;
         // The native outer update asks the global fade controller for a
@@ -258,13 +282,18 @@ export class HopperGame {
 
     this.#updateFloors();
 
-    // 0x13CAD4..0x13CB40: state 2 advances to the next descriptor stage as
-    // the upward velocity reaches its apex window.
-    if(this.phase===2&&this.player.vel.y>=0&&this.player.vel.y-this.program.physics.gravityPerUpdate<0){
-      const next=this.state.stageIndex+1;
-      this.#buildStage(next,false);
-      this.callbacks.onAdvance?.(next+1);
-      return;
+    // 0x13CAD4..0x13CB70: both normal play and state 2 watch the
+    // same 0 <= vy < 0.012 apex window. State 2 advances the stage; normal
+    // play retimes the cat controller to the falling half (24..47 @ 1).
+    if(this.player.vel.y>=0&&this.player.vel.y-this.program.physics.gravityPerUpdate<0){
+      if(this.phase===2){
+        const next=this.state.stageIndex+1;
+        this.#buildStage(next,false);
+        this.callbacks.onAdvance?.(next+1);
+        this.#tickCatAnimation();
+        return;
+      }
+      this.#retimeCatAnimation(this.program.catAnimation.falling);
     }
 
     const input=this.#inputVector();
@@ -295,6 +324,7 @@ export class HopperGame {
           hit.z-previousUpper.z
         );
         this.player.vel.y=0;
+        this.#retimeCatAnimation(this.program.catAnimation.falling);
         break;
       }
     }else if(this.player.vel.y< -physics.verticalCollisionEpsilon){
@@ -325,7 +355,7 @@ export class HopperGame {
     );
     this.player.pos.set(lower.x,lower.y,lower.z);
 
-    if(this.player.pos.y<physics.failY){this.#fall();return;}
+    if(this.player.pos.y<physics.failY){this.#fall();this.#tickCatAnimation();return;}
     if(!this.playing)return;
 
     const horizontal=updateHorizontalVelocity(this.player.vel,input,!!collision,physics);
@@ -353,6 +383,8 @@ export class HopperGame {
     this.viewTarget.set(view.x,view.y,view.z);
 
     this.callbacks.onTime?.(this.elapsedFrames/60);
+    // 0x13F4C4 calls model-controller clock 0x101870 after gameplay update.
+    this.#tickCatAnimation();
     // The original CMDL root is authored at the pogo contact point.
     this.playerMesh.position.copy(this.player.pos);
   }
