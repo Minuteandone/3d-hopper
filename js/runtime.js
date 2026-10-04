@@ -166,3 +166,56 @@ export function tickEndingRuntime(runtime,ending,{confirm=false}={}){
   runtime.mainCounter++;
   return {state:runtime.state,events,riseY:ending.risePerUpdate};
 }
+
+function overlapsVerticalSlab(lowerY,upperY,floor){
+  const half=floor.height*.5;
+  return floor.center[1]+half>=lowerY&&floor.center[1]-half<=upperY;
+}
+function insideExpandedAxis(value,center,extent,size){
+  const half=(extent+size)*.5;
+  return value>=center-half&&value<=center+half;
+}
+
+/**
+ * Translation of 0x13B8AC's lower-point movement/clamping.
+ * The routine applies Y first, then clamps X, then clamps Z. The X test uses
+ * the old Z coordinate; the Z test uses the already-clamped X coordinate.
+ * The upper argument is the separately stored upper collision point from the
+ * previous update, matching the native routine.
+ */
+export function applyLowerSideCollision(lower,upper,movement,floors,horizontalCollisionSize){
+  const next={x:lower.x,y:lower.y+movement.y,z:lower.z};
+
+  let x=lower.x+movement.x;
+  if(movement.x>0){
+    for(const floor of floors){
+      if(!overlapsVerticalSlab(next.y,upper.y,floor))continue;
+      const boundary=floor.center[0]-(floor.width+horizontalCollisionSize)*.5;
+      if(lower.x<=boundary&&x>boundary&&insideExpandedAxis(lower.z,floor.center[2],floor.depth,horizontalCollisionSize))x=boundary;
+    }
+  }else if(movement.x<0){
+    for(const floor of floors){
+      if(!overlapsVerticalSlab(next.y,upper.y,floor))continue;
+      const boundary=floor.center[0]+(floor.width+horizontalCollisionSize)*.5;
+      if(lower.x>=boundary&&x<boundary&&insideExpandedAxis(lower.z,floor.center[2],floor.depth,horizontalCollisionSize))x=boundary;
+    }
+  }
+  next.x=x;
+
+  let z=lower.z+movement.z;
+  if(movement.z>0){
+    for(const floor of floors){
+      if(!overlapsVerticalSlab(next.y,upper.y,floor))continue;
+      const boundary=floor.center[2]-(floor.depth+horizontalCollisionSize)*.5;
+      if(lower.z<=boundary&&z>boundary&&insideExpandedAxis(next.x,floor.center[0],floor.width,horizontalCollisionSize))z=boundary;
+    }
+  }else if(movement.z<0){
+    for(const floor of floors){
+      if(!overlapsVerticalSlab(next.y,upper.y,floor))continue;
+      const boundary=floor.center[2]+(floor.depth+horizontalCollisionSize)*.5;
+      if(lower.z>=boundary&&z<boundary&&insideExpandedAxis(next.x,floor.center[0],floor.width,horizontalCollisionSize))z=boundary;
+    }
+  }
+  next.z=z;
+  return next;
+}
