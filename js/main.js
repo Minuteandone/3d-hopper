@@ -34,7 +34,7 @@ async function openRom(file){
     if(!animations.has('neko_hopping_jump'))throw new Error('Original neko_hopping_jump CANM clip could not be decoded from this ROM.');
     fillArt();
     game?.renderer?.setAnimationLoop(null);$('#viewport').replaceChildren();
-    game=new HopperGame($('#viewport'),assets,models,program,{
+    game=new HopperGame($('#viewport'),assets,models,animations,program,{
       onStage:(n,meta)=>{
         if(n===3&&meta.rescueCounter===0)status.textContent='Original Stage 3 rescue platform is gone (ARM counter reached 0).';
       },
