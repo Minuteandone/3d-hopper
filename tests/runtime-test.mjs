@@ -1,7 +1,7 @@
 import fs from 'node:fs';
 import { HopperRom } from '../js/rom.js';
 import { liftHopperProgram } from '../js/executable.js';
-import { createGameState,activeStageRecords,createFloorRuntime,tickFloorRuntime,noteFall,updateHorizontalVelocity,intersectFloorTop,intersectFloorBottom,floorContainsHorizontalPoint,createEndingRuntime,tickEndingRuntime,applyLowerSideCollision,updateUpperCollisionPoint } from '../js/runtime.js';
+import { createGameState,activeStageRecords,createFloorRuntime,tickFloorRuntime,noteFall,updateHorizontalVelocity,intersectFloorTop,intersectFloorBottom,floorContainsHorizontalPoint,createEndingRuntime,tickEndingRuntime,applyLowerSideCollision,updateUpperCollisionPoint,updateViewTarget } from '../js/runtime.js';
 
 const path=process.argv[2]; if(!path)throw new Error('usage: node tests/runtime-test.mjs ROM');
 const b=fs.readFileSync(path),ab=b.buffer.slice(b.byteOffset,b.byteOffset+b.byteLength);const p=liftHopperProgram(new HopperRom(ab));
@@ -44,6 +44,13 @@ if(Math.abs(upper.x-.85)>1e-6||Math.abs(upper.y-3.80131556)>1e-6||Math.abs(upper
 const roof={center:[0,3.5,0],width:6,height:.4,depth:6};
 upper=updateUpperCollisionPoint({x:0,y:0,z:0},{x:0,y:3,z:0},{x:0,z:0},[roof],upperPhysics);
 if(Math.abs(upper.y-3.3)>1e-6)throw new Error(`upper underside clamp mismatch ${JSON.stringify(upper)}`);
+
+let view=updateViewTarget(10,{x:4,y:7,z:-3},.2,{center:[0,20,0]},.15);
+if(Math.abs(view.x-4)>1e-6||Math.abs(view.y-11.5)>1e-6||Math.abs(view.z+3)>1e-6)throw new Error(`view follow lerp mismatch ${JSON.stringify(view)}`);
+view=updateViewTarget(10,{x:4,y:7,z:-3},-.2,{center:[0,20,0]},.15);
+if(Math.abs(view.y-7)>1e-6)throw new Error(`fall-below-floor view snap mismatch ${JSON.stringify(view)}`);
+view=updateViewTarget(10,{x:4,y:21,z:-3},-.2,{center:[0,20,0]},.15);
+if(Math.abs(view.y-11.5)>1e-6)throw new Error(`fall-above-floor view should still lerp ${JSON.stringify(view)}`);
 
 const ending=createEndingRuntime();
 for(let i=0;i<60;i++){
