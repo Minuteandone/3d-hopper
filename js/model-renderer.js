@@ -9,7 +9,7 @@ function wrapModeToThree(mode){
   if(mode===3)return THREE.MirroredRepeatWrapping;
   return THREE.ClampToEdgeWrapping;
 }
-function makeTexture(asset,mapper){
+function makeTexture(asset,mapper,coordinator){
   const tex=new THREE.CanvasTexture(canvasFromTexture(asset));
   tex.colorSpace=THREE.SRGBColorSpace;
   tex.wrapS=wrapModeToThree(mapper?.wrapS??0);
@@ -17,13 +17,26 @@ function makeTexture(asset,mapper){
   tex.magFilter=(mapper?.magFilter??1)?THREE.LinearFilter:THREE.NearestFilter;
   tex.minFilter=(mapper?.minFilter??1)?THREE.LinearFilter:THREE.NearestFilter;
   tex.generateMipmaps=false;
+  if(coordinator?.mappingMethod===0){
+    tex.channel=coordinator.sourceCoordinate??0;
+    const m=coordinator.matrix;
+    if(m?.length===12){
+      tex.matrixAutoUpdate=false;
+      tex.matrix.set(
+        m[0],m[4],m[3],
+        m[1],m[5],m[7],
+        0,0,1
+      );
+    }
+  }
   return tex;
 }
 function makeMaterial(material,textures){
   const mapperIndex=Number.isInteger(material?.visibleColorMapper)?material.visibleColorMapper:0;
   const mapper=material?.textureMappers?.[mapperIndex]??material?.textureMappers?.[0]??null;
   const textureName=mapper?.textureName??material?.textureRefs?.[mapperIndex]??material?.textureRefs?.[0]??null;
-  const map=textureName&&textures.has(textureName)?makeTexture(textures.get(textureName),mapper):null;
+  const coordinator=material?.visibleTextureCoordinate??null;
+  const map=textureName&&textures.has(textureName)?makeTexture(textures.get(textureName),mapper,coordinator):null;
   const blend=material?.blend;
   const alphaBlend=!!(blend?.enabled&&!(blend.colorSource===1&&blend.colorDestination===0));
   const cullMode=material?.rasterization?.cullMode??0;
@@ -122,6 +135,8 @@ function makeGeometry(shape,primitiveSet,indexStream,bones){
   copyPositionAttribute(geometry,shape,primitiveSet,bones);
   copyNormalAttribute(geometry,shape,primitiveSet,bones);
   copyAttribute(geometry,'uv',shape.byUsage.get(VertexUsage.TextureCoordinate0),2);
+  copyAttribute(geometry,'uv1',shape.byUsage.get(VertexUsage.TextureCoordinate1),2);
+  copyAttribute(geometry,'uv2',shape.byUsage.get(VertexUsage.TextureCoordinate2),2);
   const skin=skinAttributes(shape,primitiveSet,bones);
   if(skin){geometry.setAttribute('skinIndex',new THREE.Uint16BufferAttribute(skin.indices,4));geometry.setAttribute('skinWeight',new THREE.Float32BufferAttribute(skin.weights,4));}
   geometry.setIndex(new THREE.BufferAttribute(new Uint32Array(indexStream.indices),1));
