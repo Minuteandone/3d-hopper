@@ -5,6 +5,7 @@ import { parseTextures, decodeTexture, textureMapFromRom } from '../js/cgfx.js';
 import { decodeBcstm } from '../js/audio.js';
 import { parseModels } from '../js/models.js';
 import { parsePrototypeFragmentLights } from '../js/lights.js';
+import { parsePrototypeLuts } from '../js/luts.js';
 
 const path=process.argv[2];
 if(!path) throw new Error('usage: node tests/rom-test.mjs /path/to/3D_Hopper.app');
@@ -158,6 +159,28 @@ for(const floor of [floor1,floor2]){
   if(mapper?.config!==0x6||mapper.wrapS!==0||mapper.wrapT!==0||mapper.minFilter!==1||mapper.magFilter!==1)throw new Error(`${floor.name}: floor sampler state mismatch`);
 }
 
+
+
+const luts=parsePrototypeLuts(rom.get('gfx/hopper_cat.bcmdl'));
+if(luts.length!==2)throw new Error(`expected 2 cat LUT resources, got ${luts.length}`);
+const lutByName=new Map(luts.map(l=>[l.name,l]));
+const d0=lutByName.get('hopping_Lut')?.tableMap.get('D0');
+const lookup1=lutByName.get('nekopperLut')?.tableMap.get('LookupTable_1');
+const lookup2=lutByName.get('nekopperLut')?.tableMap.get('LookupTable_2');
+for(const [name,table] of [['D0',d0],['LookupTable_1',lookup1],['LookupTable_2',lookup2]]){
+  if(!table||table.samples.length!==256||table.deltas.length!==256||table.commands.length!==0x408)throw new Error(`${name}: malformed prototype LUT payload`);
+  for(let i=0;i<255;i++){
+    const expected=table.samples[i+1]-table.samples[i];
+    if(Math.abs(table.deltas[i]-expected)>2e-7)throw new Error(`${name}: delta ${i} mismatch`);
+  }
+  if(Math.abs(table.deltas[255])>2e-7)throw new Error(`${name}: final delta must be zero`);
+  const firstCommand=new DataView(table.commands.buffer,table.commands.byteOffset,4).getUint32(0,true);
+  const quantized=Math.min(Math.trunc(table.samples[0]*0x1000),0xfff);
+  if((firstCommand&0xfff)!==quantized)throw new Error(`${name}: PICA command/sample quantization mismatch`);
+}
+if(Math.abs(d0.samples[0]-.3)>1e-6||Math.abs(d0.samples[255]-.97)>1e-6)throw new Error('D0 endpoint mismatch');
+if(Math.abs(lookup1.samples[0]-.47)>1e-6||Math.abs(lookup1.samples[255]-.72989577)>1e-6)throw new Error('LookupTable_1 endpoint mismatch');
+if(Math.abs(lookup2.samples[0]-.55)>1e-6||Math.abs(lookup2.samples[255]-.11)>1e-6)throw new Error('LookupTable_2 endpoint mismatch');
 
 const lights=parsePrototypeFragmentLights(rom.get('gfx/hopper_misc.bcmdl'));
 if(lights.length!==1||lights[0].name!=='Light1')throw new Error('expected one prototype Light1 CFLT');
