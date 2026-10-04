@@ -34,8 +34,8 @@ if(cat.materials[0]?.textureRefs[0]!=='hopping'||!cat.materials[1]?.textureRefs.
 if(cat.materials[0]?.blend?.colorSource!==1||cat.materials[0]?.blend?.colorDestination!==0) throw new Error('hopping material blend state mismatch');
 if(cat.materials[1]?.blend?.colorSource!==1||cat.materials[1]?.blend?.colorDestination!==0) throw new Error('nekopper material blend state mismatch');
 if(cat.materials[0]?.rasterization?.cullMode!==2||cat.materials[1]?.rasterization?.cullMode!==2) throw new Error('cat culling mode mismatch');
-if(cat.materials[0]?.depth?.flags!==3||!cat.materials[0].depth.testEnabled||!cat.materials[0].depth.writeEnabled)throw new Error('cat depth state mismatch');
-if(cat.materials[1]?.depth?.flags!==3||!cat.materials[1].depth.testEnabled||!cat.materials[1].depth.writeEnabled)throw new Error('nekopper depth state mismatch');
+if(cat.materials[0]?.depth?.flags!==3||!cat.materials[0].depth.testEnabled||!cat.materials[0].depth.writeEnabled||cat.materials[0].depth.compareCode!==4)throw new Error('cat depth state mismatch');
+if(cat.materials[1]?.depth?.flags!==3||!cat.materials[1].depth.testEnabled||!cat.materials[1].depth.writeEnabled||cat.materials[1].depth.compareCode!==4)throw new Error('nekopper depth state mismatch');
 if(cat.materials[0]?.visibleColorMapper!==0||cat.materials[1]?.visibleColorMapper!==1) throw new Error('cat TexEnv visible mapper selection mismatch');
 const hopMapper=cat.materials[0]?.textureMappers?.[0];
 if(hopMapper?.textureName!=='hopping'||hopMapper.config!==0x2206||hopMapper.wrapS!==2||hopMapper.wrapT!==2||hopMapper.minFilter!==1||hopMapper.magFilter!==1)throw new Error('hopping sampler state mismatch');
@@ -89,7 +89,7 @@ const floor2=parseModels(rom.get('gfx/hopper_map_floor02.bcmdl')).find(m=>m.name
 for(const floor of [floor1,floor2]){
   if(!floor)throw new Error('floor model missing');
   if(floor.materials[0]?.rasterization?.cullMode!==2)throw new Error(`${floor.name}: expected back-face culling`);
-  if(floor.materials[0]?.depth?.flags!==3||!floor.materials[0].depth.testEnabled||!floor.materials[0].depth.writeEnabled)throw new Error(`${floor.name}: floor depth state mismatch`);
+  if(floor.materials[0]?.depth?.flags!==3||!floor.materials[0].depth.testEnabled||!floor.materials[0].depth.writeEnabled||floor.materials[0].depth.compareCode!==4)throw new Error(`${floor.name}: floor depth state mismatch`);
   const blend=floor.materials[0]?.blend;
   if(blend?.colorSource!==6||blend?.colorDestination!==7)throw new Error(`${floor.name}: expected SRC_ALPHA/ONE_MINUS_SRC_ALPHA blend state`);
   const mapper=floor.materials[0]?.textureMappers?.[0];
