@@ -62,16 +62,17 @@ function copyNormalAttribute(geometry,shape,primitiveSet,bones){
 function copyPositionAttribute(geometry,shape,primitiveSet,bones){
   const attr=shape.byUsage.get(VertexUsage.Position);if(!attr)return;
   const values=new Float32Array(attr.count*3);
-  const [ox,oy,oz]=shape.positionOffset;
   // Non-smooth CGFX pieces are authored in a single related bone's local
-  // bind space. Bake that transform before runtime inverse-bind animation.
+  // bind space. Convert the vertex itself into model bind space here.
+  // Shape.PositionOffset is deliberately NOT included: NintendoWare applies
+  // that as a separate shape/model transform after vertex processing.
   const bindWorld=bindWorldForPrimitiveSet(primitiveSet,bones);
   const v=new THREE.Vector3();
   for(let i=0;i<attr.count;i++){
     v.set(
-      attr.values[i*attr.components]+ox,
-      (attr.components>1?attr.values[i*attr.components+1]:0)+oy,
-      (attr.components>2?attr.values[i*attr.components+2]:0)+oz
+      attr.values[i*attr.components],
+      attr.components>1?attr.values[i*attr.components+1]:0,
+      attr.components>2?attr.values[i*attr.components+2]:0
     );
     if(bindWorld)v.applyMatrix4(bindWorld);
     values[i*3]=v.x;values[i*3+1]=v.y;values[i*3+2]=v.z;
@@ -128,6 +129,9 @@ export function createModelInstance(model,textures,{shadows=true}={}){
       const object=skinned?new THREE.SkinnedMesh(geometry,material):new THREE.Mesh(geometry,material);
       object.name=meshInfo.name||`${model.name}_mesh`;object.castShadow=shadows;object.receiveShadow=shadows;
       if(skinned)object.bind(bones.skeleton,new THREE.Matrix4());
+      // CMDLViewer applies Shape.PositionOffset with glTranslate *after*
+      // vertex/bone processing. Keep it outside the skinning transform.
+      object.position.set(shape.positionOffset[0],shape.positionOffset[1],shape.positionOffset[2]);
       group.add(object);
     }
   }
