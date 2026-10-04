@@ -1,7 +1,7 @@
 import fs from 'node:fs';
 import { HopperRom } from '../js/rom.js';
 import { liftHopperProgram } from '../js/executable.js';
-import { createGameState,activeStageRecords,createFloorRuntime,tickFloorRuntime,noteFall,updateHorizontalVelocity,intersectFloorTop,intersectFloorBottom,floorContainsHorizontalPoint,createEndingRuntime,tickEndingRuntime } from '../js/runtime.js';
+import { createGameState,activeStageRecords,createFloorRuntime,tickFloorRuntime,noteFall,updateHorizontalVelocity,intersectFloorTop,intersectFloorBottom,floorContainsHorizontalPoint,createEndingRuntime,tickEndingRuntime,applyLowerSideCollision } from '../js/runtime.js';
 
 const path=process.argv[2]; if(!path)throw new Error('usage: node tests/runtime-test.mjs ROM');
 const b=fs.readFileSync(path),ab=b.buffer.slice(b.byteOffset,b.byteOffset+b.byteLength);const p=liftHopperProgram(new HopperRom(ab));
@@ -25,6 +25,18 @@ if(intersectFloorTop(testFloor,{x:3.41,y:11,z:0},{x:3.41,y:9,z:0},.8)!==null)thr
 if(!floorContainsHorizontalPoint(testFloor,-3.4,3.4,.8)||floorContainsHorizontalPoint(testFloor,-3.401,0,.8))throw new Error('native expanded floor bounds mismatch');
 const bottom=intersectFloorBottom(testFloor,{x:0,y:9,z:0},{x:0,y:11,z:0},.8);
 if(!bottom||Math.abs(bottom.y-9.8)>1e-6)throw new Error(`native bottom-plane collision mismatch ${JSON.stringify(bottom)}`);
+
+const slab={center:[0,0,0],width:6,height:.4,depth:6};
+let side=applyLowerSideCollision({x:-5,y:0,z:0},{x:-5,y:4.25,z:0},{x:3,y:0,z:0},[slab],.8);
+if(Math.abs(side.x-(-3.4))>1e-6||side.y!==0||side.z!==0)throw new Error(`positive-X slab clamp mismatch ${JSON.stringify(side)}`);
+side=applyLowerSideCollision({x:5,y:0,z:0},{x:5,y:4.25,z:0},{x:-3,y:0,z:0},[slab],.8);
+if(Math.abs(side.x-3.4)>1e-6)throw new Error(`negative-X slab clamp mismatch ${JSON.stringify(side)}`);
+side=applyLowerSideCollision({x:0,y:0,z:-5},{x:0,y:4.25,z:-5},{x:0,y:0,z:3},[slab],.8);
+if(Math.abs(side.z-(-3.4))>1e-6)throw new Error(`positive-Z slab clamp mismatch ${JSON.stringify(side)}`);
+side=applyLowerSideCollision({x:-5,y:1,z:0},{x:-5,y:5.25,z:0},{x:3,y:0,z:0},[slab],.8);
+if(Math.abs(side.x-(-2))>1e-6)throw new Error('side clamp should ignore slabs outside vertical overlap');
+side=applyLowerSideCollision({x:-5,y:0,z:-5},{x:-5,y:4.25,z:-5},{x:3,y:0,z:3},[slab],.8);
+if(Math.abs(side.x-(-2))>1e-6||Math.abs(side.z-(-3.4))>1e-6)throw new Error(`X-then-Z corner ordering mismatch ${JSON.stringify(side)}`);
 
 const ending=createEndingRuntime();
 for(let i=0;i<60;i++){
