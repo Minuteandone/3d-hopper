@@ -139,27 +139,43 @@ function readSkeleton(bytes,view,offset){
   return {offset,name:cstr(bytes,rel32(view,offset+0x0c)),boneCount,scalingRule:u32(view,offset+0x24),flags:u32(view,offset+0x28),bones};
 }
 
-function readMaterialTextureRefs(bytes,view,materialOffset){
-  // Hopper's prototype MTOB (revision 0x04000000) stores three self-relative
-  // TexInfo pointers at +0x2B4/+0x2B8/+0x2BC. Each TexInfo is the early
-  // NintendoWare layout whose +0x08 field points to a reference TXOB.
-  checked(bytes,materialOffset,0x2c0,'MTOB');
-  if(fourcc(bytes,materialOffset+4)!=='MTOB')throw new Error(`MTOB missing at 0x${materialOffset.toString(16)}.`);
-  const refs=[];
+function readMaterialTextureMappers(bytes,view,materialOffset){
+  // Prototype TexInfo mirrors the PICA texture-unit config at +0x24:
+  // bit 1 mag filter, bit 2 min filter, bits 8..10 wrap T, bits 12..14 wrap S.
+  const mappers=[];
   for(const field of [0x2b4,0x2b8,0x2bc]){
     const texInfo=rel32(view,materialOffset+field);
     if(!texInfo)continue;
-    checked(bytes,texInfo,0x10,'prototype TexInfo');
+    checked(bytes,texInfo,0x4c,'prototype TexInfo');
     const txob=rel32(view,texInfo+8);
-    if(!txob)continue;
+    const sampler=rel32(view,texInfo+0x0c);
+    if(!txob||!sampler)throw new Error(`Incomplete prototype TexInfo at 0x${texInfo.toString(16)}.`);
     checked(bytes,txob,0x1c,'reference TXOB');
+    checked(bytes,sampler,0x0c,'prototype texture sampler');
     if(u32(view,txob)!==0x404||fourcc(bytes,txob+4)!=='TXOB'){
       throw new Error(`Material texture mapper at 0x${texInfo.toString(16)} does not reference a TXOB.`);
     }
-    const name=cstr(bytes,rel32(view,txob+0x18));
-    if(name)refs.push(name);
+    const textureName=cstr(bytes,rel32(view,txob+0x18));
+    const config=u32(view,texInfo+0x24);
+    const minFilter=(config>>>2)&1,magFilter=(config>>>1)&1;
+    const minFilterGl=u32(view,sampler+8);
+    const expectedMinFilterGl=minFilter?0x2601:0x2600;
+    if(minFilterGl!==expectedMinFilterGl){
+      throw new Error(`PICA/GL min-filter mismatch for ${textureName}: config=${minFilter}, GL=0x${minFilterGl.toString(16)}.`);
+    }
+    mappers.push({
+      textureName,
+      texInfoOffset:texInfo,
+      samplerOffset:sampler,
+      config,
+      wrapS:(config>>>12)&7,
+      wrapT:(config>>>8)&7,
+      minFilter,
+      magFilter,
+      minFilterGl,
+    });
   }
-  return refs;
+  return mappers;
 }
 
 function readFragmentShaderState(bytes,view,materialOffset){
@@ -245,11 +261,12 @@ function readModel(bytes,view,offset){
     const blendEnabled=((blendCommand1>>>8)&0xff)===1;
     const colorSource=(blendCommand3>>>16)&0xf;
     const colorDestination=(blendCommand3>>>20)&0xf;
-    const textureRefs=readMaterialTextureRefs(bytes,view,o);
+    const textureMappers=readMaterialTextureMappers(bytes,view,o);
+    const textureRefs=textureMappers.map(m=>m.textureName);
     const fragmentShader=readFragmentShaderState(bytes,view,o);
     return {
       name:entry.name,offset:o,revision,
-      textureRefs,
+      textureMappers,textureRefs,
       visibleColorMapper:firstColorTextureMapper(fragmentShader),
       rasterization:{cullMode,commandParam:cullCommandParam,commandHeader:cullCommandHeader},
       fragmentShader,
