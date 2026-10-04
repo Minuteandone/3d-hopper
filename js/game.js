@@ -1,8 +1,8 @@
 import * as THREE from 'https://cdn.jsdelivr.net/npm/three@0.186.1/build/three.module.js';
 import { createModelInstance, disposeModelInstance } from './model-renderer.js';
-import { gridCoordinate, transformControlVector } from './executable.js';
+import { gridCoordinate, transformControlVector, computeCenterCameraPose } from './executable.js';
 import {
-  createGameState,activeStageRecords,createFloorRuntime,tickFloorRuntime,noteFall,findStartRecord,updateHorizontalVelocity,intersectFloorTop,intersectFloorBottom,createEndingRuntime,tickEndingRuntime,applyLowerSideCollision,updateUpperCollisionPoint,
+  createGameState,activeStageRecords,createFloorRuntime,tickFloorRuntime,noteFall,findStartRecord,updateHorizontalVelocity,intersectFloorTop,intersectFloorBottom,createEndingRuntime,tickEndingRuntime,applyLowerSideCollision,updateUpperCollisionPoint,updateViewTarget,
 } from './runtime.js';
 
 const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
@@ -23,6 +23,7 @@ export class HopperGame {
     this.fixedStep=1/60;
     this.input={left:false,right:false,up:false,down:false,confirm:false};this.gamepad={x:0,y:0,confirm:false};
     this.playing=false;this.elapsedFrames=0;this.phase=0;this.endingRuntime=null;
+    this.viewTarget=new THREE.Vector3();
     this.state=createGameState(program);
     this.player={pos:new THREE.Vector3(),upper:new THREE.Vector3(),vel:new THREE.Vector3(),grounded:false};
     this.platforms=[];this.stageGroup=new THREE.Group();this.scene.add(this.stageGroup);
@@ -118,8 +119,13 @@ export class HopperGame {
     this.playerMesh.position.copy(this.player.pos);
   }
 
+  #resetViewTarget(stageIndex){
+    const target=this.program.viewController.stageSetup[stageIndex]?.target??[0,0,0];
+    this.viewTarget.set(target[0],target[1],target[2]);
+  }
+
   #buildOpeningStage(){
-    this.state=createGameState(this.program);this.state.stageIndex=0;this.#clearStage();
+    this.state=createGameState(this.program);this.state.stageIndex=0;this.#clearStage();this.#resetViewTarget(0);
     const records=activeStageRecords(this.program,this.state,0);
     this.platforms=records.map(r=>this.#makeFloor(r));
     const openingRecord={...this.program.startupFloor,index:records.length};
@@ -127,7 +133,7 @@ export class HopperGame {
     this.platforms.push(opening);this.openingFloor=opening;this.openingPrepared=true;
     this.#placePlayerOnFloor(opening);this.elapsedFrames=0;
     this.callbacks.onStage?.(1,{recordCount:records.length,startupFloor:true,rescueCounter:this.state.stage2ExtraCounter});
-    this.#camera(true);
+    this.#camera();
   }
 
   #releaseOpeningFloor(){
@@ -144,7 +150,7 @@ export class HopperGame {
     const previousElapsed=this.elapsedFrames;
     if(newCampaign)this.state=createGameState(this.program);
     this.openingPrepared=false;this.openingFloor=null;this.phase=1;
-    this.state.stageIndex=index;this.#clearStage();
+    this.state.stageIndex=index;this.#clearStage();this.#resetViewTarget(index);
     const records=activeStageRecords(this.program,this.state,index);
     this.platforms=records.map(r=>this.#makeFloor(r));
     const start=findStartRecord(records);
@@ -152,7 +158,7 @@ export class HopperGame {
     this.#placePlayerOnFloor(floor);
     this.elapsedFrames=preserveElapsed?previousElapsed:0;
     this.callbacks.onStage?.(index+1,{recordCount:records.length,rescueCounter:this.state.stage2ExtraCounter});
-    this.#camera(true);
+    this.#camera();
   }
 
   #resetPlayer(startRecord=null){
@@ -338,16 +344,35 @@ export class HopperGame {
     );
     this.player.upper.set(upper.x,upper.y,upper.z);
 
+    const currentFloor=this.platforms.find(p=>p.index===this.state.currentFloorIndex)??null;
+    const view=updateViewTarget(
+      this.viewTarget.y,
+      {x:this.player.pos.x,y:this.player.pos.y,z:this.player.pos.z},
+      this.player.vel.y,
+      currentFloor,
+      this.program.viewController.followYLerp
+    );
+    this.viewTarget.set(view.x,view.y,view.z);
+
     this.callbacks.onTime?.(this.elapsedFrames/60);
     // The original CMDL root is authored at the pogo contact point.
     this.playerMesh.position.copy(this.player.pos);
   }
 
-  #camera(snap=false){
-    // Temporary browser camera. The original camera/stereo path is not translated yet.
-    const target=new THREE.Vector3(this.player.pos.x,this.player.pos.y+1.5,this.player.pos.z-4);
-    const wanted=new THREE.Vector3(this.player.pos.x*.88,this.player.pos.y+10.5,this.player.pos.z+21);
-    this.camera.position.lerp(wanted,snap?1:.09);this.camera.lookAt(target);this.camera.fov=46;this.camera.updateProjectionMatrix();
+  #camera(){
+    const pose=computeCenterCameraPose(
+      this.program.controls,
+      this.program.viewController,
+      this.state.stageIndex,
+      {x:this.viewTarget.x,y:this.viewTarget.y,z:this.viewTarget.z}
+    );
+    this.camera.position.set(pose.eye.x,pose.eye.y,pose.eye.z);
+    this.camera.up.set(0,1,0);
+    this.camera.lookAt(pose.target.x,pose.target.y,pose.target.z);
+    this.camera.fov=pose.projection.fovDegrees;
+    this.camera.near=pose.projection.near;
+    this.camera.far=pose.projection.far;
+    this.camera.updateProjectionMatrix();
   }
 
   #tick(){
@@ -356,6 +381,6 @@ export class HopperGame {
       this.accumulator=Math.min(this.accumulator+dt,.25);
       while(this.accumulator>=this.fixedStep){this.#fixedTick();this.accumulator-=this.fixedStep;}
     }
-    this.#camera(false);this.renderer.render(this.scene,this.camera);
+    this.#camera();this.renderer.render(this.scene,this.camera);
   }
 }
