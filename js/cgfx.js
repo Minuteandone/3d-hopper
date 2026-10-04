@@ -68,8 +68,10 @@ export function parseTextures(cgfxBytes){
     const levels=u32(view,p); p+=4;
     p+=8; // texture object + location flag
     const format=u32(view,p); p+=4;
-    const imageOffset=p+u32(view,p);
-    if(!imageOffset || imageOffset+0x20>bytes.length) continue;
+    const imageRel=u32(view,p);
+    if(!imageRel)continue;
+    const imageOffset=p+imageRel;
+    if(imageOffset+0x20>bytes.length)continue;
     const imageHeight=u32(view,imageOffset);
     const imageWidth=u32(view,imageOffset+4);
     const dataSize=u32(view,imageOffset+8);
@@ -107,6 +109,7 @@ export function decodeTexture(tex){
   };
 
   if(format<=11){
+    if(format===6)throw new Error('HILO8 texture decoding is not implemented; it is not equivalent to LA8.');
     const bpt=[256,192,128,128,128,128,128,64,64,64,32,32][format];
     for(let y=0;y<H;y+=8){
       for(let x=0;x<W;x+=8){
@@ -121,8 +124,6 @@ export function decodeTexture(tex){
           } else if(format>=2&&format<=4){
             o=offs+pos*2; if(o+1<data.length)put(x+x2,y+y2,...color16(view.getUint16(o,true),format));
           } else if(format===5){
-            o=offs+pos*2; if(o+1<data.length){const a=data[o],l=data[o+1];put(x+x2,y+y2,l,l,l,a);}
-          } else if(format===6){
             o=offs+pos*2; if(o+1<data.length){const a=data[o],l=data[o+1];put(x+x2,y+y2,l,l,l,a);}
           } else if(format===7){
             o=offs+pos; if(o<data.length){const l=data[o];put(x+x2,y+y2,l,l,l,255);}
