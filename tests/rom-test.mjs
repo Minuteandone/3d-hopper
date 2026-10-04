@@ -57,6 +57,12 @@ for(const bone of cat.skeleton.bones){
 
 if(cat.materials[0]?.textureRefs[0]!=='hopping'||!cat.materials[1]?.textureRefs.includes('nekopper')) throw new Error('cat material texture references were not recovered');
 
+if(cat.materials[0]?.textureMappers?.[0]?.textureName!=='hopping')throw new Error('hoppingMt Texture0 must be hopping');
+if(cat.materials[1]?.textureMappers?.[0]?.textureName!=='flockycmp'||cat.materials[1]?.textureMappers?.[1]?.textureName!=='nekopper')throw new Error('nekopperMt mapper order mismatch');
+if(cat.materials[1]?.fragmentShader?.fragmentLighting?.bumpTextureIndex!==0)throw new Error('nekopper bump source must be Texture0/flockycmp');
+if(cat.materials[1]?.fragmentShader?.stages?.[0]?.sources?.color?.[1]!==4)throw new Error('nekopper visible stage must sample Texture1/nekopper');
+
+
 const closeColor=(actual,expected,label)=>{
   if(!actual||actual.length!==expected.length)throw new Error(`${label}: missing color`);
   for(let i=0;i<expected.length;i++)if(Math.abs(actual[i]-expected[i])>1e-5)throw new Error(`${label}[${i}] ${actual[i]} != ${expected[i]}`);
