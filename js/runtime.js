@@ -254,3 +254,16 @@ export function updateUpperCollisionPoint(lower,previousUpper,input,floors,physi
   }
   return target;
 }
+
+/**
+ * Translation of normal Game view-target update 0x13E598..0x13E620.
+ * The view controller follows lower X/Z directly while Y tracks the current
+ * floor center with a 0.15 lerp, except when falling below that floor.
+ */
+export function updateViewTarget(followY,lower,verticalVelocity,currentFloor,lerp){
+  const floorY=currentFloor?.center?.[1]??lower.y;
+  const y=(verticalVelocity<0&&lower.y<floorY)
+    ?lower.y
+    :followY+(floorY-followY)*lerp;
+  return {x:lower.x,y,z:lower.z};
+}
