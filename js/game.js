@@ -2,7 +2,7 @@ import * as THREE from 'https://cdn.jsdelivr.net/npm/three@0.186.1/build/three.m
 import { createModelInstance, disposeModelInstance } from './model-renderer.js';
 import { gridCoordinate, transformControlVector } from './executable.js';
 import {
-  createGameState,activeStageRecords,createFloorRuntime,tickFloorRuntime,noteFall,findStartRecord,updateHorizontalVelocity,
+  createGameState,activeStageRecords,createFloorRuntime,tickFloorRuntime,noteFall,findStartRecord,updateHorizontalVelocity,intersectFloorTop,
 } from './runtime.js';
 
 const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
@@ -80,12 +80,12 @@ export class HopperGame {
   }
 
   #makeFloor(record){
-    const runtime=createFloorRuntime(record);const group=new THREE.Group();
+    const runtime=createFloorRuntime(record,this.program.floorBuilder);const group=new THREE.Group();
     const modelName=record.type===3?'hopper_floor02_model':'hopper_floor01_model';
     const model=this.models.get(modelName);
     if(!model)throw new Error(`The ROM did not provide ${modelName}.`);
     const scaleXZ=record.spacing*this.program.floorBuilder.tileModelScale;
-    const scaleY=this.program.floorBuilder.collisionHalfHeight;
+    const scaleY=this.program.floorBuilder.verticalModelScale;
     for(let row=0;row<record.rows;row++)for(let col=0;col<record.columns;col++){
       const x=gridCoordinate(record.columns,record.spacing,col),z=gridCoordinate(record.rows,record.spacing,row);
       const tile=createModelInstance(model,this.assets,{shadows:true});
@@ -181,18 +181,20 @@ export class HopperGame {
 
   #landingFloor(previous,current){
     if(this.player.vel.y>0)return null;
-    let best=null;const skin=this.program.physics.collisionSkin;
-    for(const f of this.platforms){
-      const surface=f.center[1];
-      if(previous.y<surface||current.y>surface)continue;
-      const dx=Math.abs(current.x-f.center[0]),dz=Math.abs(current.z-f.center[2]);
-      if(dx<=f.width/2+skin&&dz<=f.depth/2+skin){if(!best||surface>best.center[1])best=f;}
+    const size=this.program.physics.horizontalCollisionSize;
+    // 0x13CECC..0x13D404 scans runtime floors in array order and accepts
+    // the first downward plane/bounds intersection.
+    for(const floor of this.platforms){
+      const hit=intersectFloorTop(floor,previous,current,size);
+      if(hit)return {floor,hit};
     }
-    return best;
+    return null;
   }
 
-  #land(floor){
-    const p=this.program.physics;this.player.pos.y=floor.center[1];
+  #land(collision){
+    const {floor,hit}=collision;
+    const p=this.program.physics;
+    this.player.pos.set(hit.x,hit.y,hit.z);
     this.player.vel.y=floor.velocity[1]+p.landingBouncePerUpdate;
     this.player.pos.x+=floor.velocity[0];this.player.pos.z+=floor.velocity[2];
     this.player.grounded=true;this.state.currentFloorIndex=floor.index;
@@ -237,10 +239,10 @@ export class HopperGame {
     const displacement=this.player.vel.clone().multiplyScalar(state2?this.program.physics.state2DisplacementScale:1);
     const current=this.player.pos.clone().add(displacement);
     this.player.pos.copy(current);
-    const floor=this.#landingFloor(previous,current);if(floor)this.#land(floor);
+    const collision=this.#landingFloor(previous,current);if(collision)this.#land(collision);
     if(this.player.pos.y<this.program.physics.failY){this.#fall();return;}
     if(!this.playing)return;
-    const horizontal=updateHorizontalVelocity(this.player.vel,input,!!floor,this.program.physics);
+    const horizontal=updateHorizontalVelocity(this.player.vel,input,!!collision,this.program.physics);
     this.player.vel.x=horizontal.x;this.player.vel.z=horizontal.z;
     this.callbacks.onTime?.(this.elapsedFrames/60);
     // The original CMDL root is authored at the pogo contact point.
