@@ -34,6 +34,11 @@ if(cat.materials[0]?.textureRefs[0]!=='hopping'||!cat.materials[1]?.textureRefs.
 if(cat.materials[0]?.blend?.colorSource!==1||cat.materials[0]?.blend?.colorDestination!==0) throw new Error('hopping material blend state mismatch');
 if(cat.materials[1]?.blend?.colorSource!==1||cat.materials[1]?.blend?.colorDestination!==0) throw new Error('nekopper material blend state mismatch');
 if(cat.materials[0]?.rasterization?.cullMode!==2||cat.materials[1]?.rasterization?.cullMode!==2) throw new Error('cat culling mode mismatch');
+if(cat.materials[0]?.visibleColorMapper!==0||cat.materials[1]?.visibleColorMapper!==1) throw new Error('cat TexEnv visible mapper selection mismatch');
+const hopMapper=cat.materials[0]?.textureMappers?.[0];
+if(hopMapper?.textureName!=='hopping'||hopMapper.config!==0x2206||hopMapper.wrapS!==2||hopMapper.wrapT!==2||hopMapper.minFilter!==1||hopMapper.magFilter!==1)throw new Error('hopping sampler state mismatch');
+const nekoMapper=cat.materials[1]?.textureMappers?.[1];
+if(nekoMapper?.textureName!=='nekopper'||nekoMapper.config!==0x2200||nekoMapper.wrapS!==2||nekoMapper.wrapT!==2||nekoMapper.minFilter!==0||nekoMapper.magFilter!==0)throw new Error('nekopper sampler state mismatch');
 const hoppingMat=cat.materials[0],nekopperMat=cat.materials[1];
 if(hoppingMat.visibleColorMapper!==0||nekopperMat.visibleColorMapper!==1)throw new Error('cat visible color mapper must come from TexEnv');
 const hoppingStage0=hoppingMat.fragmentShader?.stages?.[0];
@@ -76,6 +81,8 @@ for(const floor of [floor1,floor2]){
   if(floor.materials[0]?.rasterization?.cullMode!==2)throw new Error(`${floor.name}: expected back-face culling`);
   const blend=floor.materials[0]?.blend;
   if(blend?.colorSource!==6||blend?.colorDestination!==7)throw new Error(`${floor.name}: expected SRC_ALPHA/ONE_MINUS_SRC_ALPHA blend state`);
+  const mapper=floor.materials[0]?.textureMappers?.[0];
+  if(mapper?.config!==0x6||mapper.wrapS!==0||mapper.wrapT!==0||mapper.minFilter!==1||mapper.magFilter!==1)throw new Error(`${floor.name}: floor sampler state mismatch`);
 }
 
 for(const modelPath of ['gfx/hopper_cat.bcmdl','gfx/hopper_map_floor01.bcmdl','gfx/hopper_map_floor02.bcmdl','gfx/hopper_title.bcmdl']){
