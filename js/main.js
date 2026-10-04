@@ -9,7 +9,7 @@ import { HopperAudio } from './audio.js';
 import { bcsarFromRom } from './bcsar.js';
 
 const $=s=>document.querySelector(s);
-const boot=$('#boot'),titleScreen=$('#titleScreen'),finish=$('#finish'),thanks=$('#thanks'),errorBox=$('#error');
+const boot=$('#boot'),titleScreen=$('#titleScreen'),thanks=$('#thanks'),errorBox=$('#error');
 const touch=$('#touchControls'),status=$('#romStatus'),audioToggle=$('#audioToggle');
 let rom=null,assets=null,models=null,animations=null,emitters=null,soundCatalog=null,program=null,game=null,audio=null,muted=false;
 
@@ -20,7 +20,7 @@ function drawTexture(canvas,tex,fit='contain'){
   const ctx=canvas.getContext('2d');ctx.clearRect(0,0,d.width,d.height);ctx.putImageData(new ImageData(d.data,d.width,d.height),0,0);canvas.style.objectFit=fit;
 }
 function drawThanks(){const tex=assets.get('thank_youU')||assets.get('thank_youD');if(tex)drawTexture($('#thanksArt'),tex);}
-function fillArt(){for(const [sel,name] of [['#titleArt','title'],['#pressArt','press_a'],['#congratsArt','congratulations']]){const t=assets.get(name);if(t)drawTexture($(sel),t);}drawThanks();}
+function fillArt(){for(const [sel,name] of [['#titleArt','title'],['#pressArt','press_a']]){const t=assets.get(name);if(t)drawTexture($(sel),t);}drawThanks();}
 function updateAudioButton(){audioToggle.textContent=muted?'🔇 Audio off':'🔊 ROM audio';audioToggle.setAttribute('aria-pressed',String(muted));}
 
 async function openRom(file){
@@ -51,14 +51,14 @@ async function openRom(file){
         if(event.type==='starshower')status.textContent='Ending frame 240 · original starshower00 trigger reached';
       },
       onThanks:info=>{
-        audio?.stop();show(touch,false);show(finish,false);show(titleScreen,false);show(thanks,true);drawThanks();
+        audio?.stop();show(touch,false);show(titleScreen,false);show(thanks,true);drawThanks();
         status.textContent=`Native state 5 targets ${info.scene}; original global fade (argument ${info.fadeArgument}) is not yet translated`;
       }
     });
     game.bindTouch(touch);
     const audioCount=['sound/stream/DUMMY_LOOPED.bcstm','sound/stream/HOPPER_BGM_CONGRATS.bcstm'].filter(p=>rom.has(p)).length;
     status.textContent=`Ready · 4 descriptor stages · ${models.size} BCMDL models · ${animations.size} CANM clip · ${emitters.size} PEMT emitters · ${assets.size} textures · ${soundCatalog.sounds.length} BCSAR sounds · gameplay translation incomplete`;
-    show(boot,false);show(finish,false);show(thanks,false);show(titleScreen,true);
+    show(boot,false);show(thanks,false);show(titleScreen,true);
   }catch(e){status.textContent='ROM/code lift failed';fail(e);}
 }
 
@@ -66,11 +66,10 @@ for(const input of [$('#romInput'),$('#romInputBig')])input.addEventListener('ch
 
 function start(stage=0){
   if(!game)return;try{audio?.playStageBgm();}catch(e){console.warn('ROM audio unavailable',e);}
-  show(titleScreen,false);show(finish,false);show(thanks,false);show(touch,true);game.start(stage);
+  show(titleScreen,false);show(thanks,false);show(touch,true);game.start(stage);
 }
 
 $('#startButton').addEventListener('click',()=>start(0));
-$('#thanksButton').addEventListener('click',()=>{show(finish,false);show(thanks,true);drawThanks();});
 $('#backButton').addEventListener('click',()=>{audio?.stop();show(thanks,false);show(titleScreen,true);game?.pause();});
 audioToggle.addEventListener('click',()=>{muted=!muted;audio?.setMuted(muted);updateAudioButton();if(!muted&&game?.playing){try{audio?.playStageBgm();}catch(e){console.warn('ROM audio unavailable',e);}}});
 updateAudioButton();
