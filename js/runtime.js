@@ -59,7 +59,6 @@ export function noteFall(program,state){
 }
 
 export function findStartRecord(records){return records.find(r=>r.type===2)??records[0];}
-export function findGoalRecord(records){return records.find(r=>r.type===3)??records.at(-1);}
 
 /**
  * Translation of the horizontal-velocity branch at 0x13D4A8..0x13D57C.
