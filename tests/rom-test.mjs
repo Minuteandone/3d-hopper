@@ -92,6 +92,14 @@ const identity34=[1,0,0,0,0,1,0,0,0,0,1,0];
 for(const [name,coord] of [['hopping',hopCoord],['nekopper',nekoCoord]])
   for(let i=0;i<12;i++)if(Math.abs(coord.matrix[i]-identity34[i])>1e-6)throw new Error(`${name} visible texture matrix mismatch at ${i}`);
 if(Math.abs(nekopperMat.textureCoordinators[0].rotate-1.1170107126)>1e-6)throw new Error('nekopper mask-coordinate rotation mismatch');
+
+const hopLighting=hoppingMat.fragmentShader?.fragmentLighting;
+const nekoLighting=nekopperMat.fragmentShader?.fragmentLighting;
+if(hopLighting?.flags!==0x0a||hopLighting.layerConfig!==0||hopLighting.fresnelConfig!==0||
+   hopLighting.bumpTextureIndex!==0||hopLighting.bumpMode!==0||hopLighting.bumpRenormalize)throw new Error('hopping fragment-lighting config mismatch');
+if(nekoLighting?.flags!==0x17||nekoLighting.layerConfig!==3||nekoLighting.fresnelConfig!==0||
+   nekoLighting.bumpTextureIndex!==0||nekoLighting.bumpMode!==1||!nekoLighting.bumpRenormalize)throw new Error('nekopper fragment-lighting config mismatch');
+
 const hoppingStage0=hoppingMat.fragmentShader?.stages?.[0];
 if(hoppingStage0?.colorMode!==3||hoppingStage0?.alphaMode!==1||
    JSON.stringify(hoppingStage0.colorSources.slice(0,2))!=='[1,3]'||
