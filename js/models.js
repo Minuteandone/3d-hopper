@@ -170,7 +170,25 @@ function readModel(bytes,view,offset){
   for(let i=0;i<meshCount;i++)meshes.push(readMesh(bytes,view,rel32(view,meshArray+i*4)));
   for(let i=0;i<shapeCount;i++)shapes.push(readShape(bytes,view,rel32(view,shapeArray+i*4)));
   const materialEntries=materialDictOffset?parseDict(bytes,materialDictOffset):[];
-  const materials=materialEntries.slice(0,materialCount).map(entry=>({name:entry.name,offset:entry.offset,textureRefs:readMaterialTextureRefs(bytes,view,entry.offset)}));
+  const materials=materialEntries.slice(0,materialCount).map(entry=>{
+    const o=entry.offset;
+    checked(bytes,o,0x164,'prototype MTOB');
+    if(fourcc(bytes,o+4)!=='MTOB')throw new Error(`MTOB missing at 0x${o.toString(16)}.`);
+    const revision=u32(view,o+8);
+    if(revision!==0x04000000)throw new Error(`Unsupported Hopper MTOB revision 0x${revision.toString(16)}.`);
+    // Verified against this prototype's rev-4 material layout.
+    const blendMode=u32(view,o+0x13c);
+    const blendCommand1=u32(view,o+0x150);
+    const blendCommand3=u32(view,o+0x158);
+    const blendEnabled=((blendCommand1>>>8)&0xff)===1;
+    const colorSource=(blendCommand3>>>16)&0xf;
+    const colorDestination=(blendCommand3>>>20)&0xf;
+    return {
+      name:entry.name,offset:o,revision,
+      textureRefs:readMaterialTextureRefs(bytes,view,o),
+      blend:{mode:blendMode,enabled:blendEnabled,colorSource,colorDestination,command1:blendCommand1,command3:blendCommand3},
+    };
+  });
   return {offset,name:cstr(bytes,rel32(view,offset+0x0c)),flags:u32(view,offset+0x18),
     scale:[f32(view,offset+0x30),f32(view,offset+0x34),f32(view,offset+0x38)],rotation:[f32(view,offset+0x3c),f32(view,offset+0x40),f32(view,offset+0x44)],translation:[f32(view,offset+0x48),f32(view,offset+0x4c),f32(view,offset+0x50)],
     localMatrix:matrix34(view,offset+0x54),worldMatrix:matrix34(view,offset+0x84),meshes,materials,shapes,skeleton:readSkeleton(bytes,view,skeletonOffset)};
