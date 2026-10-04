@@ -282,7 +282,7 @@ export function liftHopperProgram(romOrBuffer){
         projection:{fovDegrees:commonView.fov15,near:commonView.near,far:commonView.far,frustumParameter0:commonView.frustum0,frustumParameter1:commonView.frustum1},
         position:[0,0,0],
         orientationDegrees:[exe.readF32(0x151b70),exe.readF32(0x151b74),0],
-        auxiliaryPair:[exe.readF32(0x151f24),commonView.auxiliary2],
+        auxiliaryPair:[exe.readF32(0x151b70),commonView.auxiliary2],
       },
     ],
   };
