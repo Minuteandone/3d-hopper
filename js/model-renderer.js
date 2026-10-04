@@ -31,6 +31,18 @@ function makeTexture(asset,mapper,coordinator){
   }
   return tex;
 }
+function depthFuncToThree(code){
+  return [
+    THREE.NeverDepth,
+    THREE.AlwaysDepth,
+    THREE.EqualDepth,
+    THREE.NotEqualDepth,
+    THREE.LessDepth,
+    THREE.LessEqualDepth,
+    THREE.GreaterDepth,
+    THREE.GreaterEqualDepth,
+  ][code]??THREE.LessEqualDepth;
+}
 function makeMaterial(material,textures){
   const mapperIndex=Number.isInteger(material?.visibleColorMapper)?material.visibleColorMapper:0;
   const mapper=material?.textureMappers?.[mapperIndex]??material?.textureMappers?.[0]??null;
@@ -48,6 +60,7 @@ function makeMaterial(material,textures){
     side,
     depthTest:material?.depth?.testEnabled??true,
     depthWrite:material?.depth?.writeEnabled??true,
+    depthFunc:depthFuncToThree(material?.depth?.compareCode),
   });
 }
 function buildBones(model,group){
