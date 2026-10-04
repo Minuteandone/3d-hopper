@@ -147,7 +147,13 @@ function makeGeometry(shape,primitiveSet,indexStream,bones){
   const geometry=new THREE.BufferGeometry();
   copyPositionAttribute(geometry,shape,primitiveSet,bones);
   copyNormalAttribute(geometry,shape,primitiveSet,bones);
-  copyAttribute(geometry,'color',shape.byUsage.get(VertexUsage.Color),4);
+  const colorAttr=shape.byUsage.get(VertexUsage.Color);
+  if(colorAttr)copyAttribute(geometry,'color',colorAttr,4);
+  else{
+    const colors=new Float32Array(shape.vertexCount*4);
+    colors.fill(1);
+    geometry.setAttribute('color',new THREE.BufferAttribute(colors,4));
+  }
   copyAttribute(geometry,'uv',shape.byUsage.get(VertexUsage.TextureCoordinate0),2);
   copyAttribute(geometry,'uv1',shape.byUsage.get(VertexUsage.TextureCoordinate1),2);
   copyAttribute(geometry,'uv2',shape.byUsage.get(VertexUsage.TextureCoordinate2),2);
