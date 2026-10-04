@@ -2,7 +2,7 @@ import * as THREE from 'https://cdn.jsdelivr.net/npm/three@0.186.1/build/three.m
 import { createModelInstance, disposeModelInstance } from './model-renderer.js';
 import { gridCoordinate, transformControlVector } from './executable.js';
 import {
-  createGameState,activeStageRecords,createFloorRuntime,tickFloorRuntime,noteFall,findStartRecord,updateHorizontalVelocity,intersectFloorTop,
+  createGameState,activeStageRecords,createFloorRuntime,tickFloorRuntime,noteFall,findStartRecord,updateHorizontalVelocity,intersectFloorTop,intersectFloorBottom,
 } from './runtime.js';
 
 const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
@@ -196,7 +196,6 @@ export class HopperGame {
     const p=this.program.physics;
     this.player.pos.set(hit.x,hit.y,hit.z);
     this.player.vel.y=floor.velocity[1]+p.landingBouncePerUpdate;
-    this.player.pos.x+=floor.velocity[0];this.player.pos.z+=floor.velocity[2];
     this.player.grounded=true;this.state.currentFloorIndex=floor.index;
     if(floor.record.type===3){
       if(this.state.stageIndex===this.program.stages.length-1){
@@ -234,15 +233,45 @@ export class HopperGame {
     const input=this.#inputVector();
     this.player.grounded=false;
     const state2=this.phase===2;
-    this.player.vel.y-=state2?this.program.physics.state2GravityPerUpdate:this.program.physics.gravityPerUpdate;
+    const physics=this.program.physics;
+    this.player.vel.y-=state2?physics.state2GravityPerUpdate:physics.gravityPerUpdate;
     const previous=this.player.pos.clone();
-    const displacement=this.player.vel.clone().multiplyScalar(state2?this.program.physics.state2DisplacementScale:1);
-    const current=this.player.pos.clone().add(displacement);
-    this.player.pos.copy(current);
-    const collision=this.#landingFloor(previous,current);if(collision)this.#land(collision);
-    if(this.player.pos.y<this.program.physics.failY){this.#fall();return;}
+    const sweepEnd=previous.clone().add(this.player.vel);
+    const displacement=this.player.vel.clone().multiplyScalar(state2?physics.state2DisplacementScale:1);
+    const ordinaryEnd=previous.clone().add(displacement);
+    let collision=null;
+
+    if(this.player.vel.y>physics.verticalCollisionEpsilon){
+      const headOffset=physics.upperCollisionOffset;
+      const upperStart=previous.clone();upperStart.y+=headOffset;
+      const upperEnd=sweepEnd.clone();upperEnd.y+=headOffset;
+      let ceilingHit=null;
+      for(const floor of this.platforms){
+        const hit=intersectFloorBottom(floor,upperStart,upperEnd,physics.horizontalCollisionSize);
+        if(hit){ceilingHit=hit;break;}
+      }
+      if(ceilingHit){
+        // 0x13CC6C..0x13CD24 moves by (hit - upperStart), then zeros vy.
+        this.player.pos.set(
+          previous.x+(ceilingHit.x-upperStart.x),
+          previous.y+(ceilingHit.y-upperStart.y),
+          previous.z+(ceilingHit.z-upperStart.z)
+        );
+        this.player.vel.y=0;
+      }else this.player.pos.copy(ordinaryEnd);
+    }else if(this.player.vel.y< -physics.verticalCollisionEpsilon){
+      // Native collision sweep uses the full velocity vector even in state 2;
+      // state-2's 0.5 scale applies to ordinary displacement when no hit occurs.
+      collision=this.#landingFloor(previous,sweepEnd);
+      if(collision)this.#land(collision);else this.player.pos.copy(ordinaryEnd);
+    }else{
+      this.player.vel.y=0;
+      this.player.pos.copy(ordinaryEnd);
+    }
+
+    if(this.player.pos.y<physics.failY){this.#fall();return;}
     if(!this.playing)return;
-    const horizontal=updateHorizontalVelocity(this.player.vel,input,!!collision,this.program.physics);
+    const horizontal=updateHorizontalVelocity(this.player.vel,input,!!collision,physics);
     this.player.vel.x=horizontal.x;this.player.vel.z=horizontal.z;
     this.callbacks.onTime?.(this.elapsedFrames/60);
     // The original CMDL root is authored at the pogo contact point.
