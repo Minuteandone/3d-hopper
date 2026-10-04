@@ -7,10 +7,9 @@ function matrix4From34(m){const out=new THREE.Matrix4();out.set(m[0],m[1],m[2],m
 function makeTexture(asset){const tex=new THREE.CanvasTexture(canvasFromTexture(asset));tex.colorSpace=THREE.SRGBColorSpace;tex.wrapS=THREE.RepeatWrapping;tex.wrapT=THREE.RepeatWrapping;tex.magFilter=THREE.LinearFilter;tex.minFilter=THREE.LinearMipmapLinearFilter;return tex;}
 function makeMaterial(material,textures){
   const refs=material?.textureRefs??[];
-  // Multi-texture PICA combiners are not translated yet. For Hopper's
-  // two-texture cat material, the final mapper is the visible painted atlas.
-  const textureName=[...refs].reverse().find(name=>textures.has(name));
-  const map=textureName?makeTexture(textures.get(textureName)):null;
+  const mapper=material?.visibleColorMapper;
+  const textureName=Number.isInteger(mapper)?refs[mapper]:null;
+  const map=textureName&&textures.has(textureName)?makeTexture(textures.get(textureName)):null;
   const blend=material?.blend;
   const alphaBlend=!!(blend?.enabled&&!(blend.colorSource===1&&blend.colorDestination===0));
   const cullMode=material?.rasterization?.cullMode??0;
