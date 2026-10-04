@@ -36,9 +36,21 @@ function parseDvle(bytes,view,dvlbOffset,offset,index){
   if(fourcc(bytes,offset)!=='DVLE')throw new Error(`DVLE missing at 0x${offset.toString(16)}.`);
   const outputOffset=rel(offset,u32(view,offset+0x28));
   const outputCount=u32(view,offset+0x2c);
+  const labelOffset=rel(offset,u32(view,offset+0x20));
+  const labelCount=u32(view,offset+0x24);
   const symbolOffset=rel(offset,u32(view,offset+0x38));
   const symbolSize=u32(view,offset+0x3c);
   checked(bytes,symbolOffset,symbolSize,'DVLE symbol table');
+
+  const labels=[];
+  for(let i=0;i<labelCount;i++){
+    const o=labelOffset+i*0x10;checked(bytes,o,0x10,'DVLE label');
+    const id=u16(view,o),unknown=u16(view,o+2),programOffsetWords=u32(view,o+4),programWords=u32(view,o+8),nameOffset=u32(view,o+0x0c);
+    labels.push({
+      id,unknown,programOffsetWords,programWords,
+      name:cstr(bytes,symbolOffset+nameOffset,Math.max(1,symbolSize-nameOffset)),
+    });
+  }
 
   const outputs=[];
   for(let i=0;i<outputCount;i++){
@@ -65,7 +77,7 @@ function parseDvle(bytes,view,dvlbOffset,offset,index){
     endMainOffsetWords:u32(view,offset+0x0c),
     inputMask:u16(view,offset+0x10),
     outputMask:u16(view,offset+0x12),
-    outputs,uniforms,
+    labels,outputs,uniforms,
     symbolOffset,symbolSize,
   };
 }
