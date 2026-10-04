@@ -20,7 +20,7 @@ eq(p.stages[3].records.map(r=>r.position),[[0,0,0],[8,0,-16],[16,0,-32]],'stage 
 eq(p.stages[3].records[1].offset,[-8,0,8],'moving floor vector');
 if(p.stages[3].records[1].parameter!==720||p.stages[3].records[1].flag!==1)throw new Error('moving floor metadata mismatch');
 if(!close(p.physics.gravityPerUpdate,.012)||!close(p.physics.state2GravityPerUpdate,.006)||!close(p.physics.state2DisplacementScale,.5)||!close(p.physics.landingBouncePerUpdate,.42)||!close(p.physics.airVelocityLerp,.03))throw new Error('motion constants mismatch');
-if(!close(p.physics.horizontalCollisionSize,.8)||!close(p.physics.movementRadius,4.25)||!close(p.physics.spawnClearance,7.35)||!close(p.physics.failY,-25))throw new Error('runtime constants mismatch');
+if(!close(p.physics.horizontalCollisionSize,.8)||!close(p.physics.upperCollisionOffset,4.25)||!close(p.physics.spawnClearance,7.35)||!close(p.physics.failY,-25))throw new Error('runtime constants mismatch');
 if(!close(p.floorBuilder.collisionHeight,.4)||!close(p.floorBuilder.verticalModelScale,.4)||!close(p.floorBuilder.tileModelScale,.1))throw new Error('floor-builder scale/collision constants mismatch');
 if(gridCoordinate(3,8,0)!==-8||gridCoordinate(3,8,1)!==0||gridCoordinate(3,8,2)!==8)throw new Error('translated grid math mismatch');
 const mover=p.stages[3].records[1];
