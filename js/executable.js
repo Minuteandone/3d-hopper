@@ -244,6 +244,7 @@ export function liftHopperProgram(romOrBuffer){
     upperCollisionOffset:exe.readF32(0x151b90),
     spawnClearance:exe.readF32(0x151f3c),
     failY:exe.readF32(0x13cccc),
+    verticalCollisionEpsilon:exe.readF32(0x13ccfc),
   };
   const floorBuilder={
     recordStride:48,
