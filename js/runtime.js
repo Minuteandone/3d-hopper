@@ -266,3 +266,41 @@ export function updateViewTarget(followY,lower,verticalVelocity,currentFloor,ler
     :followY+(floorY-followY)*lerp;
   return {x:lower.x,y,z:lower.z};
 }
+
+/**
+ * Model-controller animation slot clock used by 0x101870.
+ * Hopper's cat uses slot 0; the generic controller supports 16 slots.
+ */
+export function createAnimationSlot(config,{loop=false}={}){
+  return {
+    current:config.current,
+    start:config.start,
+    end:config.end,
+    step:config.step,
+    loop:!!loop,
+  };
+}
+
+export function retimeAnimationSlot(slot,config){
+  slot.current=config.current;
+  slot.start=config.start;
+  slot.end=config.end;
+  slot.step=config.step;
+  return slot;
+}
+
+/**
+ * Translation of the slot-clock portion of 0x101870.
+ * The native controller increments before evaluating the animation frame.
+ */
+export function tickAnimationSlot(slot){
+  slot.current+=slot.step;
+  if(slot.current>slot.end){
+    if(!slot.loop)slot.current=slot.end;
+    else{
+      while(slot.current>slot.end)slot.current-=slot.end;
+      slot.current+=slot.start;
+    }
+  }
+  return slot.current;
+}
