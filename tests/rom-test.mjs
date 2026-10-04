@@ -168,6 +168,11 @@ for(const {shapeIndex,shape,ps} of catSets){
 }
 if(JSON.stringify(cat.shapes[1].primitiveSets[0].relatedBones)!=='[2]'||
    JSON.stringify(cat.shapes[2].primitiveSets[0].relatedBones)!=='[23]')throw new Error('single-bone primitive palettes mismatch');
+const catColor=cat.shapes[0].byUsage.get(3);
+if(!catColor||catColor.format!==0x1401||catColor.components!==4||
+   Math.abs(catColor.scale-(2/255))>1e-7)throw new Error('cat primary vertex-color stream mismatch');
+if(cat.shapes[1].byUsage.has(3)||cat.shapes[2].byUsage.has(3))
+  throw new Error('rigid cat shapes unexpectedly contain primary vertex color');
 const expectedShapeOffsets=[
   [0.0000080125,2.42500997,-0.286096007],
   [-0.00603182,2.50541997,0.0272913],
