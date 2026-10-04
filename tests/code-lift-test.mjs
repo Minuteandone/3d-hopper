@@ -1,6 +1,6 @@
 import fs from 'node:fs';
 import { HopperRom } from '../js/rom.js';
-import { liftHopperProgram, gridCoordinate, movingFloorAt, transformControlVector } from '../js/executable.js';
+import { liftHopperProgram, gridCoordinate, movingFloorAt, transformControlVector, computeCenterCameraPose } from '../js/executable.js';
 
 const path=process.argv[2];
 if(!path)throw new Error('usage: node tests/code-lift-test.mjs /path/to/3D_Hopper.app');
@@ -35,12 +35,12 @@ if(!close(p.viewController.followYLerp,.15))throw new Error('normal view follow 
 eq(p.viewController.stageSetup.map(v=>[
   v.projection.fovDegrees,v.projection.near,v.projection.far,
   v.projection.frustumParameter0,v.projection.frustumParameter1,
-  ...v.orientationDegrees,...v.auxiliaryPair
+  v.distance,v.pitchDegrees,v.headingDegrees,v.secondaryAngleDegrees,...v.auxiliaryPair
 ]),[
-  [15,10,300,.5,.75,65,-40,0,62.5,2.5],
-  [20,10,300,.5,.75,60,-20,0,50,2],
-  [20,10,300,.5,.7,60,-50,25,60,2],
-  [15,10,300,.5,.75,65,-40,0,65,2],
+  [15,10,300,.5,.75,65,-40,0,0,62.5,2.5],
+  [20,10,300,.5,.75,60,-20,0,0,50,2],
+  [20,10,300,.5,.7,60,-50,25,0,60,2],
+  [15,10,300,.5,.75,65,-40,0,0,65,2],
 ],'stage view-controller setup');
 eq(p.viewController.selectors,[1024,1040,0x401],'view selectors');
 eq(p.viewController.projectionOffsets,[136,200,264],'projection matrix offsets');
@@ -48,7 +48,22 @@ eq(p.viewController.viewOffsets,[328,376,424],'view matrix offsets');
 eq(p.viewController.inverseViewOffsets,[472,520,568],'inverse-view matrix offsets');
 
 if(!close(p.controls.degreesToTrigUnits,.7111111283))throw new Error('control degree conversion mismatch');
-eq(p.controls.stageSetup.map(s=>s.orientation),[[65,-40,0],[60,-20,0],[60,-50,25],[65,-40,0]],'stage orientation setup');
+eq(p.controls.stageSetup.map(s=>s.controlHeadingDegrees),[0,0,25,0],'stage control headings');
+const cameraOffsets=[
+  [0,41.778077678,49.789148085],
+  [0,20.520134522,56.378626274],
+  [37.748447813,41.65110381,20.958021185],
+  [0,41.778077678,49.789148085],
+];
+for(let i=0;i<4;i++){
+  const pose=computeCenterCameraPose(p.controls,p.viewController,i,{x:0,y:0,z:0});
+  if(!close(pose.eye.x,cameraOffsets[i][0],1e-5)||
+     !close(pose.eye.y,cameraOffsets[i][1],1e-5)||
+     !close(pose.eye.z,cameraOffsets[i][2],1e-5)){
+    throw new Error(`stage ${i+1} center camera eye mismatch: ${JSON.stringify(pose.eye)}`);
+  }
+}
+
 const right3=transformControlVector(p.controls,2,1,0);
 if(!close(right3.x,.9062611285,1e-6)||!close(right3.z,-.4225963562,1e-6))throw new Error(`stage 3 control rotation mismatch: ${JSON.stringify(right3)}`);
 const forward3=transformControlVector(p.controls,2,0,1);
