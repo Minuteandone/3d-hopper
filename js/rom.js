@@ -85,9 +85,11 @@ export class HopperRom {
 
     const visited = new Set();
     const walk = (prefix, dirIndex) => {
-      const guardKey = `${prefix}:${dirIndex}`;
-      if (visited.has(guardKey)) return;
-      visited.add(guardKey);
+      // A directory index identifies one FSE object. Tracking the index itself
+      // prevents malformed parent/child cycles even when each recursive path
+      // would otherwise produce a new textual prefix.
+      if (visited.has(dirIndex)) return;
+      visited.add(dirIndex);
       const fse = readFse(dirIndex);
       let p = bodyOffset + fse.entryDataOffset;
       let fdiIndex = fse.startingFdiIndex;
