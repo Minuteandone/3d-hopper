@@ -34,6 +34,21 @@ if(cat.materials[0]?.textureRefs[0]!=='hopping'||!cat.materials[1]?.textureRefs.
 if(cat.materials[0]?.blend?.colorSource!==1||cat.materials[0]?.blend?.colorDestination!==0) throw new Error('hopping material blend state mismatch');
 if(cat.materials[1]?.blend?.colorSource!==1||cat.materials[1]?.blend?.colorDestination!==0) throw new Error('nekopper material blend state mismatch');
 if(cat.materials[0]?.rasterization?.cullMode!==2||cat.materials[1]?.rasterization?.cullMode!==2) throw new Error('cat culling mode mismatch');
+const hoppingMat=cat.materials[0],nekopperMat=cat.materials[1];
+if(hoppingMat.visibleColorMapper!==0||nekopperMat.visibleColorMapper!==1)throw new Error('cat visible color mapper must come from TexEnv');
+const hoppingStage0=hoppingMat.fragmentShader?.stages?.[0];
+if(hoppingStage0?.colorMode!==3||hoppingStage0?.alphaMode!==1||
+   JSON.stringify(hoppingStage0.colorSources.slice(0,2))!=='[1,3]'||
+   JSON.stringify(hoppingStage0.alphaSources.slice(0,2))!=='[0,3]')throw new Error('hopping TexEnv stage 0 mismatch');
+const nekoStage0=nekopperMat.fragmentShader?.stages?.[0];
+const nekoStage1=nekopperMat.fragmentShader?.stages?.[1];
+if(nekoStage0?.colorMode!==3||nekoStage0?.alphaMode!==1||
+   JSON.stringify(nekoStage0.colorSources.slice(0,2))!=='[1,4]'||
+   JSON.stringify(nekoStage0.alphaSources.slice(0,2))!=='[0,3]')throw new Error('nekopper TexEnv stage 0 mismatch');
+if(nekoStage1?.colorMode!==2||nekoStage1?.alphaMode!==2||
+   JSON.stringify(nekoStage1.colorSources.slice(0,2))!=='[2,15]'||
+   JSON.stringify(nekoStage1.alphaSources.slice(0,2))!=='[15,3]')throw new Error('nekopper TexEnv stage 1 mismatch');
+if(hoppingMat.fragmentShader?.alphaTest?.enabled||nekopperMat.fragmentShader?.alphaTest?.enabled)throw new Error('cat alpha test should be disabled');
 
 if(cat.shapes.map(s=>s.primitiveSets.map(p=>p.skinningMode)).flat().join(',')!=='2,2,2,0,0') throw new Error('cat skinning modes mismatch');
 const catSets=cat.shapes.flatMap((shape,shapeIndex)=>shape.primitiveSets.map(ps=>({shapeIndex,shape,ps})));
