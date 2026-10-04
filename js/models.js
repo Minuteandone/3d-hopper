@@ -258,6 +258,23 @@ function readRev4FragmentLightingTable(bytes,view,fragmentOffset){
   return out;
 }
 
+function readMaterialShaderReference(bytes,view,materialOffset){
+  const offset=rel32(view,materialOffset+0x2c4);
+  if(!offset)return null;
+  checked(bytes,offset,0x20,'prototype SHDR');
+  if(fourcc(bytes,offset+4)!=='SHDR')throw new Error(`SHDR missing at 0x${offset.toString(16)}.`);
+  return {
+    offset,
+    type:u32(view,offset),
+    revision:u32(view,offset+8),
+    name:cstr(bytes,rel32(view,offset+0x0c)),
+    linkedShaderName:cstr(bytes,rel32(view,offset+0x18)),
+    unknown2:u32(view,offset+0x10),
+    unknown3:u32(view,offset+0x14),
+    unknown4:u32(view,offset+0x1c),
+  };
+}
+
 function readFragmentShaderState(bytes,view,materialOffset){
   const offset=rel32(view,materialOffset+0x2c8);
   if(!offset)return null;
@@ -371,6 +388,8 @@ function readModel(bytes,view,offset){
     const textureCoordinators=readTextureCoordinators(bytes,view,o);
     const textureMappers=readMaterialTextureMappers(bytes,view,o);
     const textureRefs=textureMappers.map(m=>m.textureName);
+    const shader=readMaterialShaderReference(bytes,view,o);
+    const shaderProgramDescriptionIndex=u32(view,o+0x2cc);
     const fragmentShader=readFragmentShaderState(bytes,view,o);
     const lightSetIndex=u32(view,o+0x2d8);
     const visibleColorMapper=firstColorTextureMapper(fragmentShader);
@@ -391,7 +410,7 @@ function readModel(bytes,view,offset){
         compareCode:(depthCommand1>>>4)&7,
         command1:depthCommand1,command2:depthCommand2,command3:depthCommand3,command4:depthCommand4,
       },
-      fragmentShader,
+      shader,shaderProgramDescriptionIndex,fragmentShader,
       blend:{mode:blendMode,enabled:blendEnabled,colorSource,colorDestination,command1:blendCommand1,command3:blendCommand3},
     };
   });
