@@ -7,9 +7,19 @@ function matrix4From34(m){const out=new THREE.Matrix4();out.set(m[0],m[1],m[2],m
 function makeTexture(asset){const tex=new THREE.CanvasTexture(canvasFromTexture(asset));tex.colorSpace=THREE.SRGBColorSpace;tex.wrapS=THREE.RepeatWrapping;tex.wrapT=THREE.RepeatWrapping;tex.magFilter=THREE.LinearFilter;tex.minFilter=THREE.LinearMipmapLinearFilter;return tex;}
 function makeMaterial(material,textures){
   const refs=material?.textureRefs??[];
+  // Multi-texture PICA combiners are not translated yet. For Hopper's
+  // two-texture cat material, the final mapper is the visible painted atlas.
   const textureName=[...refs].reverse().find(name=>textures.has(name));
   const map=textureName?makeTexture(textures.get(textureName)):null;
-  return new THREE.MeshStandardMaterial({map,color:0xffffff,roughness:.9,metalness:0,transparent:!!map,alphaTest:map?0.01:0,side:THREE.DoubleSide});
+  const blend=material?.blend;
+  const alphaBlend=!!(blend?.enabled&&!(blend.colorSource===1&&blend.colorDestination===0));
+  return new THREE.MeshStandardMaterial({
+    map,color:0xffffff,roughness:.9,metalness:0,
+    transparent:alphaBlend,
+    alphaTest:0,
+    side:THREE.DoubleSide,
+    depthWrite:true,
+  });
 }
 function buildBones(model,group){
   if(!model.skeleton?.bones?.length)return null;
