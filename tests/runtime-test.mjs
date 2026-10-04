@@ -1,7 +1,7 @@
 import fs from 'node:fs';
 import { HopperRom } from '../js/rom.js';
 import { liftHopperProgram } from '../js/executable.js';
-import { createGameState,activeStageRecords,createFloorRuntime,tickFloorRuntime,noteFall,updateHorizontalVelocity,intersectFloorTop,intersectFloorBottom,floorContainsHorizontalPoint,createEndingRuntime,tickEndingRuntime,applyLowerSideCollision,updateUpperCollisionPoint,updateViewTarget } from '../js/runtime.js';
+import { createGameState,activeStageRecords,createFloorRuntime,tickFloorRuntime,noteFall,updateHorizontalVelocity,intersectFloorTop,intersectFloorBottom,floorContainsHorizontalPoint,createEndingRuntime,tickEndingRuntime,applyLowerSideCollision,updateUpperCollisionPoint,updateViewTarget,createAnimationSlot,retimeAnimationSlot,tickAnimationSlot } from '../js/runtime.js';
 
 const path=process.argv[2]; if(!path)throw new Error('usage: node tests/runtime-test.mjs ROM');
 const b=fs.readFileSync(path),ab=b.buffer.slice(b.byteOffset,b.byteOffset+b.byteLength);const p=liftHopperProgram(new HopperRom(ab));
@@ -51,6 +51,21 @@ view=updateViewTarget(10,{x:4,y:7,z:-3},-.2,{center:[0,20,0]},.15);
 if(Math.abs(view.y-7)>1e-6)throw new Error(`fall-below-floor view snap mismatch ${JSON.stringify(view)}`);
 view=updateViewTarget(10,{x:4,y:21,z:-3},-.2,{center:[0,20,0]},.15);
 if(Math.abs(view.y-11.5)>1e-6)throw new Error(`fall-above-floor view should still lerp ${JSON.stringify(view)}`);
+
+const anim=createAnimationSlot(p.catAnimation.stageSetup,{loop:false});
+if(tickAnimationSlot(anim)!==25)throw new Error('stage animation clock must advance before evaluation');
+retimeAnimationSlot(anim,p.catAnimation.landing);
+if(tickAnimationSlot(anim)!==1)throw new Error('landing animation must begin at evaluated frame 1');
+for(let i=0;i<40;i++)tickAnimationSlot(anim);
+if(anim.current!==23)throw new Error(`landing animation did not clamp at 23: ${anim.current}`);
+retimeAnimationSlot(anim,p.catAnimation.falling);
+if(tickAnimationSlot(anim)!==25)throw new Error('falling animation must begin at evaluated frame 25');
+for(let i=0;i<40;i++)tickAnimationSlot(anim);
+if(anim.current!==47)throw new Error(`falling animation did not clamp at 47: ${anim.current}`);
+retimeAnimationSlot(anim,p.catAnimation.endingFrame60);
+if(Math.abs(tickAnimationSlot(anim)-24.5)>1e-6)throw new Error('ending half-speed animation clock mismatch');
+const loopAnim=createAnimationSlot({current:47,start:24,end:47,step:1},{loop:true});
+if(tickAnimationSlot(loopAnim)!==25)throw new Error(`generic looping slot wrap mismatch: ${loopAnim.current}`);
 
 const ending=createEndingRuntime();
 for(let i=0;i<60;i++){
