@@ -27,6 +27,20 @@ const mover=p.stages[3].records[1];
 const quarter=movingFloorAt(mover,179);
 if(!close(quarter.position[0],0)||!close(quarter.position[2],-8))throw new Error(`moving-floor sine mismatch: ${quarter.position}`);
 if(p.initialState.stage2ExtraCounter!==2)throw new Error('game constructor state mismatch');
+eq([
+  p.catAnimation.stageSetup.current,p.catAnimation.stageSetup.start,p.catAnimation.stageSetup.end,p.catAnimation.stageSetup.step
+],[24,24,47,1],'stage/retry cat animation range');
+eq([
+  p.catAnimation.landing.current,p.catAnimation.landing.start,p.catAnimation.landing.end,p.catAnimation.landing.step
+],[0,0,23,1],'landing cat animation range');
+eq([
+  p.catAnimation.falling.current,p.catAnimation.falling.start,p.catAnimation.falling.end,p.catAnimation.falling.step
+],[24,24,47,1],'falling cat animation range');
+eq([
+  p.catAnimation.endingFrame60.current,p.catAnimation.endingFrame60.start,p.catAnimation.endingFrame60.end,p.catAnimation.endingFrame60.step
+],[24,24,47,.5],'ending cat animation range');
+if(p.catAnimation.binderAddress!==0x101a20||p.catAnimation.clockAddress!==0x101870)throw new Error('cat animation controller routine mapping mismatch');
+
 if(!close(p.ending.risePerUpdate,.42)||p.ending.introUpdates!==60||p.ending.starShowerUpdate!==240||p.ending.postShowerTimeoutUpdates!==600)throw new Error('ending timeline constants mismatch');
 if(p.ending.starShowerEffectSlot!==5||p.ending.starShowerY!==65||p.ending.thanksSceneName!=='Thanks'||p.ending.state5FadeArgument!==30)throw new Error('ending resource/scene mapping mismatch');
 eq(p.ending.frame60Controller,[24,24,47,.5],'ending frame-60 controller values');
