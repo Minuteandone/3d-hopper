@@ -255,6 +255,11 @@ function readModel(bytes,view,offset){
     const cullCommandHeader=u32(view,o+0x120);
     if(cullCommandHeader!==0x00010040)throw new Error(`Unexpected Hopper face-culling command 0x${cullCommandHeader.toString(16)}.`);
     const cullMode=cullCommandParam&3;
+    const depthFlags=u32(view,o+0x128);
+    const depthCommand1=u32(view,o+0x12c);
+    const depthCommand2=u32(view,o+0x130);
+    const depthCommand3=u32(view,o+0x134);
+    const depthCommand4=u32(view,o+0x138);
     const blendMode=u32(view,o+0x13c);
     const blendCommand1=u32(view,o+0x150);
     const blendCommand3=u32(view,o+0x158);
@@ -269,6 +274,13 @@ function readModel(bytes,view,offset){
       textureMappers,textureRefs,
       visibleColorMapper:firstColorTextureMapper(fragmentShader),
       rasterization:{cullMode,commandParam:cullCommandParam,commandHeader:cullCommandHeader},
+      depth:{
+        flags:depthFlags,
+        testEnabled:(depthFlags&1)!==0,
+        writeEnabled:(depthFlags&2)!==0,
+        compareCode:(depthCommand1>>>4)&7,
+        command1:depthCommand1,command2:depthCommand2,command3:depthCommand3,command4:depthCommand4,
+      },
       fragmentShader,
       blend:{mode:blendMode,enabled:blendEnabled,colorSource,colorDestination,command1:blendCommand1,command3:blendCommand3},
     };
