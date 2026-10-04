@@ -33,6 +33,8 @@ if(cat.skeleton?.bones.length!==24) throw new Error(`expected 24 cat bones, got 
 if(cat.materials[0]?.textureRefs[0]!=='hopping'||!cat.materials[1]?.textureRefs.includes('nekopper')) throw new Error('cat material texture references were not recovered');
 if(cat.materials[0]?.blend?.colorSource!==1||cat.materials[0]?.blend?.colorDestination!==0) throw new Error('hopping material blend state mismatch');
 if(cat.materials[1]?.blend?.colorSource!==1||cat.materials[1]?.blend?.colorDestination!==0) throw new Error('nekopper material blend state mismatch');
+if(cat.materials[0]?.rasterization?.cullMode!==2||cat.materials[1]?.rasterization?.cullMode!==2) throw new Error('cat culling mode mismatch');
+
 if(cat.shapes.map(s=>s.primitiveSets.map(p=>p.skinningMode)).flat().join(',')!=='2,2,2,0,0') throw new Error('cat skinning modes mismatch');
 const catSets=cat.shapes.flatMap((shape,shapeIndex)=>shape.primitiveSets.map(ps=>({shapeIndex,shape,ps})));
 for(const {shapeIndex,shape,ps} of catSets){
@@ -56,6 +58,7 @@ const floor1=parseModels(rom.get('gfx/hopper_map_floor01.bcmdl')).find(m=>m.name
 const floor2=parseModels(rom.get('gfx/hopper_map_floor02.bcmdl')).find(m=>m.name==='hopper_floor02_model');
 for(const floor of [floor1,floor2]){
   if(!floor)throw new Error('floor model missing');
+  if(floor.materials[0]?.rasterization?.cullMode!==2)throw new Error(`${floor.name}: expected back-face culling`);
   const blend=floor.materials[0]?.blend;
   if(blend?.colorSource!==6||blend?.colorDestination!==7)throw new Error(`${floor.name}: expected SRC_ALPHA/ONE_MINUS_SRC_ALPHA blend state`);
 }
