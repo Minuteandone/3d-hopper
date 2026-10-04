@@ -28,6 +28,7 @@ jobs:
           node --check js/fragment-lighting.js
           node --check js/texenv.js
           node --check js/pica-material.js
+          node --check js/shbin.js
           node --check js/model-renderer.js
           node --check js/animation.js
           node --check js/emitters.js
@@ -42,6 +43,7 @@ jobs:
           node --check tests/effects-test.mjs
           node --check tests/fragment-lighting-test.mjs
           node --check tests/texenv-test.mjs
+          node --check tests/shbin-test.mjs
 
           node --check tests/code-lift-test.mjs
           node --check tests/runtime-test.mjs
