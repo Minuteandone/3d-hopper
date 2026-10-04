@@ -240,7 +240,7 @@ export function liftHopperProgram(romOrBuffer){
     floorHitInputScale:exe.readF32(0x13d7c0),
     airVelocityLerp:exe.readF32(0x13d7c4),
     movementVectorScale:exe.readF32(0x13d7c8),
-    collisionSkin:exe.readF32(0x151b8c),
+    horizontalCollisionSize:exe.readF32(0x151b8c),
     movementRadius:exe.readF32(0x151b90),
     spawnClearance:exe.readF32(0x151f3c),
     failY:exe.readF32(0x13cccc),
@@ -248,11 +248,12 @@ export function liftHopperProgram(romOrBuffer){
   const floorBuilder={
     recordStride:48,
     gridCenterFactor:exe.readF32(0x13c4d8),
-    collisionHalfHeight:exe.readF32(0x13c4e0),
+    collisionHeight:exe.readF32(0x13c4e0),
+    verticalModelScale:exe.readF32(0x13c4e0),
     tileModelScale:exe.readF32(0x13c4e4),
     sourceAddress:0x13c034,
   };
-  if(!near(floorBuilder.gridCenterFactor,0.5)||!near(floorBuilder.collisionHalfHeight,0.4)||!near(floorBuilder.tileModelScale,0.1)){
+  if(!near(floorBuilder.gridCenterFactor,0.5)||!near(floorBuilder.collisionHeight,0.4)||!near(floorBuilder.tileModelScale,0.1)){
     throw new Error('Floor-builder constants do not match the supported build.');
   }
   return {
