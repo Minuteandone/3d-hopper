@@ -83,3 +83,21 @@ export function prototypeLutMapFromRom(rom){
   for(const lut of parsePrototypeLuts(rom.get('gfx/hopper_cat.bcmdl')))out.set(lut.name,{...lut,source:'gfx/hopper_cat.bcmdl'});
   return out;
 }
+
+/**
+ * Evaluate Hopper's revision-2 absolute LUT using the same logical mapping
+ * SPICA uses when expanding it to a 512-entry signed texture:
+ * negative inputs hold sample[0], positive inputs traverse samples[0..255].
+ *
+ * This helper deliberately supports only the absolute tables present in Hopper.
+ */
+export function samplePrototypeAbsoluteLut(table,input,scale=1){
+  if(!table.absolute)throw new Error('Signed prototype LUT sampling is not implemented for this Hopper-only helper.');
+  const x=Math.max(0,Math.min(1,input));
+  // The native table is 256 samples over the non-negative half. Linear
+  // interpolation mirrors the GPU's filtered lookup closely without inventing
+  // a curve fit.
+  const p=x*255,i=Math.floor(p),t=p-i;
+  const a=table.samples[i],b=table.samples[Math.min(255,i+1)];
+  return Math.min(a+(b-a)*t,1/scale)*scale;
+}
