@@ -4,12 +4,26 @@ import { VertexUsage } from './models.js';
 import { sampleTransformTrack } from './animation.js';
 
 function matrix4From34(m){const out=new THREE.Matrix4();out.set(m[0],m[1],m[2],m[3],m[4],m[5],m[6],m[7],m[8],m[9],m[10],m[11],0,0,0,1);return out;}
-function makeTexture(asset){const tex=new THREE.CanvasTexture(canvasFromTexture(asset));tex.colorSpace=THREE.SRGBColorSpace;tex.wrapS=THREE.RepeatWrapping;tex.wrapT=THREE.RepeatWrapping;tex.magFilter=THREE.LinearFilter;tex.minFilter=THREE.LinearMipmapLinearFilter;return tex;}
+function wrapModeToThree(mode){
+  if(mode===2)return THREE.RepeatWrapping;
+  if(mode===3)return THREE.MirroredRepeatWrapping;
+  return THREE.ClampToEdgeWrapping;
+}
+function makeTexture(asset,mapper){
+  const tex=new THREE.CanvasTexture(canvasFromTexture(asset));
+  tex.colorSpace=THREE.SRGBColorSpace;
+  tex.wrapS=wrapModeToThree(mapper?.wrapS??0);
+  tex.wrapT=wrapModeToThree(mapper?.wrapT??0);
+  tex.magFilter=(mapper?.magFilter??1)?THREE.LinearFilter:THREE.NearestFilter;
+  tex.minFilter=(mapper?.minFilter??1)?THREE.LinearFilter:THREE.NearestFilter;
+  tex.generateMipmaps=false;
+  return tex;
+}
 function makeMaterial(material,textures){
-  const refs=material?.textureRefs??[];
-  const mapper=material?.visibleColorMapper;
-  const textureName=Number.isInteger(mapper)?refs[mapper]:null;
-  const map=textureName&&textures.has(textureName)?makeTexture(textures.get(textureName)):null;
+  const mapperIndex=Number.isInteger(material?.visibleColorMapper)?material.visibleColorMapper:0;
+  const mapper=material?.textureMappers?.[mapperIndex]??material?.textureMappers?.[0]??null;
+  const textureName=mapper?.textureName??material?.textureRefs?.[mapperIndex]??material?.textureRefs?.[0]??null;
+  const map=textureName&&textures.has(textureName)?makeTexture(textures.get(textureName),mapper):null;
   const blend=material?.blend;
   const alphaBlend=!!(blend?.enabled&&!(blend.colorSource===1&&blend.colorDestination===0));
   const cullMode=material?.rasterization?.cullMode??0;
