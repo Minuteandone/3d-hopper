@@ -2,7 +2,7 @@ import * as THREE from 'https://cdn.jsdelivr.net/npm/three@0.186.1/build/three.m
 import { createModelInstance, disposeModelInstance } from './model-renderer.js';
 import { gridCoordinate, transformControlVector } from './executable.js';
 import {
-  createGameState,activeStageRecords,createFloorRuntime,tickFloorRuntime,noteFall,findStartRecord,updateHorizontalVelocity,intersectFloorTop,intersectFloorBottom,createEndingRuntime,tickEndingRuntime,
+  createGameState,activeStageRecords,createFloorRuntime,tickFloorRuntime,noteFall,findStartRecord,updateHorizontalVelocity,intersectFloorTop,intersectFloorBottom,createEndingRuntime,tickEndingRuntime,applyLowerSideCollision,updateUpperCollisionPoint,
 } from './runtime.js';
 
 const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
@@ -24,7 +24,7 @@ export class HopperGame {
     this.input={left:false,right:false,up:false,down:false,confirm:false};this.gamepad={x:0,y:0,confirm:false};
     this.playing=false;this.elapsedFrames=0;this.phase=0;this.endingRuntime=null;
     this.state=createGameState(program);
-    this.player={pos:new THREE.Vector3(),vel:new THREE.Vector3(),grounded:false};
+    this.player={pos:new THREE.Vector3(),upper:new THREE.Vector3(),vel:new THREE.Vector3(),grounded:false};
     this.platforms=[];this.stageGroup=new THREE.Group();this.scene.add(this.stageGroup);
 
     this.#lights();this.#makeSky();this.#makePlayer();this.#events();
@@ -109,6 +109,11 @@ export class HopperGame {
   #placePlayerOnFloor(floor){
     const center=floor.center;
     this.player.pos.set(center[0],center[1]+this.program.physics.spawnClearance,center[2]);
+    this.player.upper.set(
+      this.player.pos.x,
+      this.player.pos.y+this.program.physics.upperCollisionLength,
+      this.player.pos.z
+    );
     this.player.vel.set(0,0,0);this.player.grounded=false;this.state.currentFloorIndex=floor.index;
     this.playerMesh.position.copy(this.player.pos);
   }
@@ -200,9 +205,8 @@ export class HopperGame {
   }
 
   #land(collision){
-    const {floor,hit}=collision;
+    const {floor}=collision;
     const p=this.program.physics;
-    this.player.pos.set(hit.x,hit.y,hit.z);
     this.player.vel.y=floor.velocity[1]+p.landingBouncePerUpdate;
     this.player.grounded=true;this.state.currentFloorIndex=floor.index;
     if(floor.record.type===3){
@@ -234,6 +238,7 @@ export class HopperGame {
     if(this.phase===3){
       const tick=tickEndingRuntime(this.endingRuntime,this.program.ending,{confirm:this.input.confirm||this.gamepad.confirm});
       this.player.pos.y+=tick.riseY;
+      this.player.upper.y+=tick.riseY;
       this.playerMesh.position.copy(this.player.pos);
       for(const event of tick.events)this.callbacks.onEndingEvent?.(event);
       if(tick.state===5){
@@ -263,44 +268,76 @@ export class HopperGame {
     const state2=this.phase===2;
     const physics=this.program.physics;
     this.player.vel.y-=state2?physics.state2GravityPerUpdate:physics.gravityPerUpdate;
-    const previous=this.player.pos.clone();
-    const sweepEnd=previous.clone().add(this.player.vel);
-    const displacement=this.player.vel.clone().multiplyScalar(state2?physics.state2DisplacementScale:1);
-    const ordinaryEnd=previous.clone().add(displacement);
+
+    const previousLower=this.player.pos.clone();
+    const previousUpper=this.player.upper.clone();
+    const movement=this.player.vel.clone().multiplyScalar(
+      state2?physics.state2DisplacementScale:1
+    );
     let collision=null;
 
     if(this.player.vel.y>physics.verticalCollisionEpsilon){
-      const headOffset=physics.upperCollisionOffset;
-      const upperStart=previous.clone();upperStart.y+=headOffset;
-      const upperEnd=sweepEnd.clone();upperEnd.y+=headOffset;
-      let ceilingHit=null;
+      // 0x13CC04..0x13CE9C sweeps the separately stored upper point with
+      // the full velocity, not the state-2-scaled ordinary displacement.
+      const upperSweepEnd=previousUpper.clone().add(this.player.vel);
       for(const floor of this.platforms){
-        const hit=intersectFloorBottom(floor,upperStart,upperEnd,physics.horizontalCollisionSize);
-        if(hit){ceilingHit=hit;break;}
-      }
-      if(ceilingHit){
-        // 0x13CC6C..0x13CD24 moves by (hit - upperStart), then zeros vy.
-        this.player.pos.set(
-          previous.x+(ceilingHit.x-upperStart.x),
-          previous.y+(ceilingHit.y-upperStart.y),
-          previous.z+(ceilingHit.z-upperStart.z)
+        const hit=intersectFloorBottom(
+          floor,previousUpper,upperSweepEnd,physics.upperHorizontalCollisionSize
+        );
+        if(!hit)continue;
+        movement.set(
+          hit.x-previousUpper.x,
+          hit.y-previousUpper.y,
+          hit.z-previousUpper.z
         );
         this.player.vel.y=0;
-      }else this.player.pos.copy(ordinaryEnd);
+        break;
+      }
     }else if(this.player.vel.y< -physics.verticalCollisionEpsilon){
-      // Native collision sweep uses the full velocity vector even in state 2;
-      // state-2's 0.5 scale applies to ordinary displacement when no hit occurs.
-      collision=this.#landingFloor(previous,sweepEnd);
-      if(collision)this.#land(collision);else this.player.pos.copy(ordinaryEnd);
+      // 0x13CECC..0x13D404 does the same with the lower pogo point.
+      const lowerSweepEnd=previousLower.clone().add(this.player.vel);
+      collision=this.#landingFloor(previousLower,lowerSweepEnd);
+      if(collision){
+        movement.set(
+          collision.hit.x-previousLower.x,
+          collision.hit.y-previousLower.y,
+          collision.hit.z-previousLower.z
+        );
+        this.#land(collision);
+      }
     }else{
       this.player.vel.y=0;
-      this.player.pos.copy(ordinaryEnd);
+      movement.y=0;
     }
+
+    // 0x13D414 calls 0x13B8AC after the vertical sweep. That helper owns
+    // the actual lower-point position write and X/Z slab-side clamping.
+    const lower=applyLowerSideCollision(
+      {x:previousLower.x,y:previousLower.y,z:previousLower.z},
+      {x:previousUpper.x,y:previousUpper.y,z:previousUpper.z},
+      {x:movement.x,y:movement.y,z:movement.z},
+      this.platforms,
+      physics.horizontalCollisionSize
+    );
+    this.player.pos.set(lower.x,lower.y,lower.z);
 
     if(this.player.pos.y<physics.failY){this.#fall();return;}
     if(!this.playing)return;
+
     const horizontal=updateHorizontalVelocity(this.player.vel,input,!!collision,physics);
     this.player.vel.x=horizontal.x;this.player.vel.z=horizontal.z;
+
+    // 0x13D5E0..0x13D7E4 rebuilds the upper collision point from the
+    // transformed control vector and clamps it against platform undersides.
+    const upper=updateUpperCollisionPoint(
+      lower,
+      {x:previousUpper.x,y:previousUpper.y,z:previousUpper.z},
+      input,
+      this.platforms,
+      physics
+    );
+    this.player.upper.set(upper.x,upper.y,upper.z);
+
     this.callbacks.onTime?.(this.elapsedFrames/60);
     // The original CMDL root is authored at the pogo contact point.
     this.playerMesh.position.copy(this.player.pos);
