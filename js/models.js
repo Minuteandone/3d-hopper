@@ -227,6 +227,14 @@ function readFragmentShaderState(bytes,view,materialOffset){
   if(!offset)return null;
   checked(bytes,offset,0xe0,'prototype fragment shader state');
 
+  const fragmentLighting={
+    flags:u32(view,offset+0x10),
+    layerConfig:u32(view,offset+0x14),
+    fresnelConfig:u32(view,offset+0x18),
+    bumpTextureIndex:u32(view,offset+0x1c),
+    bumpMode:u32(view,offset+0x20),
+    bumpRenormalize:u32(view,offset+0x24)!==0,
+  };
   const expectedHeaders=[0x804f00c0,0x804f00c8,0x804f00d0,0x804f00d8,0x804f00f0,0x804f00f8];
   const stages=[];
   for(let i=0;i<6;i++){
@@ -251,7 +259,7 @@ function readFragmentShaderState(bytes,view,materialOffset){
   const alphaParam=u32(view,offset+0xd8),alphaHeader=u32(view,offset+0xdc);
   if(alphaHeader!==0x000f0104)throw new Error(`Unexpected Hopper alpha-test command 0x${alphaHeader.toString(16)}.`);
   return {
-    offset,stages,
+    offset,fragmentLighting,stages,
     alphaTest:{
       enabled:(alphaParam&1)!==0,
       function:(alphaParam>>>4)&7,
