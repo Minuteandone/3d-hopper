@@ -5,7 +5,7 @@ import { parseTextures, decodeTexture, textureMapFromRom } from '../js/cgfx.js';
 import { decodeBcstm } from '../js/audio.js';
 import { parseModels } from '../js/models.js';
 import { parsePrototypeFragmentLights } from '../js/lights.js';
-import { parsePrototypeLuts } from '../js/luts.js';
+import { parsePrototypeLuts, samplePrototypeAbsoluteLut } from '../js/luts.js';
 
 const path=process.argv[2];
 if(!path) throw new Error('usage: node tests/rom-test.mjs /path/to/3D_Hopper.app');
@@ -184,6 +184,13 @@ for(const [name,table] of [['D0',d0],['LookupTable_1',lookup1],['LookupTable_2',
 if(Math.abs(d0.samples[0]-.3)>1e-6||Math.abs(d0.samples[255]-.97)>1e-6)throw new Error('D0 endpoint mismatch');
 if(Math.abs(lookup1.samples[0]-.47)>1e-6||Math.abs(lookup1.samples[255]-.72989577)>1e-6)throw new Error('LookupTable_1 endpoint mismatch');
 if(Math.abs(lookup2.samples[0]-.55)>1e-6||Math.abs(lookup2.samples[255]-.11)>1e-6)throw new Error('LookupTable_2 endpoint mismatch');
+
+if(!d0.absolute||!lookup1.absolute||!lookup2.absolute)throw new Error('Hopper lighting LUTs must be absolute-input samplers');
+if(Math.abs(samplePrototypeAbsoluteLut(d0,-1,1)-d0.samples[0])>1e-6||
+   Math.abs(samplePrototypeAbsoluteLut(d0,0,1)-d0.samples[0])>1e-6||
+   Math.abs(samplePrototypeAbsoluteLut(d0,1,1)-d0.samples[255])>1e-6)throw new Error('absolute LUT signed-domain mapping mismatch');
+if(Math.abs(samplePrototypeAbsoluteLut(lookup1,1,2)-1)>1e-6)throw new Error('LUT post-scale clamp mismatch');
+
 
 const lights=parsePrototypeFragmentLights(rom.get('gfx/hopper_misc.bcmdl'));
 if(lights.length!==1||lights[0].name!=='Light1')throw new Error('expected one prototype Light1 CFLT');
