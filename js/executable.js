@@ -361,6 +361,42 @@ export function liftHopperProgram(romOrBuffer){
     ],
   };
 
+  const catAnimation={
+    binderAddress:0x101a20,
+    clockAddress:0x101870,
+    slotIndex:0,
+    // These are direct writes to the cat model-controller slot clock.
+    stageSetup:{
+      sourceAddress:0x151e68,
+      current:exe.readF32(0x151f40),
+      start:exe.readF32(0x151f40),
+      end:exe.readF32(0x151f44),
+      step:exe.readF32(0x151b94),
+    },
+    landing:{
+      sourceAddress:0x13d0c0,
+      current:exe.readF32(0x13cce0),
+      start:exe.readF32(0x13cce0),
+      end:exe.readF32(0x13d32c),
+      step:exe.readF32(0x13ccf0),
+    },
+    falling:{
+      apexAddress:0x13cb54,
+      headCollisionAddress:0x13cd9c,
+      current:exe.readF32(0x13cce8),
+      start:exe.readF32(0x13cce8),
+      end:exe.readF32(0x13ccec),
+      step:exe.readF32(0x13ccf0),
+    },
+    endingFrame60:{
+      sourceAddress:0x13e7c8,
+      current:exe.readF32(0x13e934),
+      start:exe.readF32(0x13e934),
+      end:exe.readF32(0x13e938),
+      step:exe.readF32(0x13e920),
+    },
+  };
+
   const physics={
     gravityPerUpdate:exe.readF32(0x13cce4),
     state2GravityPerUpdate:exe.readF32(0x13ccf8),
@@ -414,7 +450,7 @@ export function liftHopperProgram(romOrBuffer){
         stateSetup:0x1517dc,stageGlobalInitializer:STAGE_GLOBAL_INITIALIZER,startupSetup:0x13f8c0,movingFloorUpdate:0x13dd58,endingUpdate:0x13e630,endingReset:0x13b74c,viewControllerRebuild:0x15eaec,
       },
     },
-    stages,startupFloor,controls,viewController,physics,ending,floorBuilder,
+    stages,startupFloor,controls,viewController,catAnimation,physics,ending,floorBuilder,
     initialState:{stageIndex:0,stage2ExtraCounter:2},
     executable:exe,
   };
