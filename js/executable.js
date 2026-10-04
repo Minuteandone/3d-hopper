@@ -241,7 +241,7 @@ export function liftHopperProgram(romOrBuffer){
     airVelocityLerp:exe.readF32(0x13d7c4),
     movementVectorScale:exe.readF32(0x13d7c8),
     horizontalCollisionSize:exe.readF32(0x151b8c),
-    movementRadius:exe.readF32(0x151b90),
+    upperCollisionOffset:exe.readF32(0x151b90),
     spawnClearance:exe.readF32(0x151f3c),
     failY:exe.readF32(0x13cccc),
   };
