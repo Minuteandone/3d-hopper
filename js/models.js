@@ -222,6 +222,36 @@ export function textureCoordinateIndexForMapper(texCoordConfig,mapperIndex){
   return mapperIndex;
 }
 
+function readRev4LightingReference(bytes,view,offset){
+  if(!offset)return null;
+  checked(bytes,offset,0x0c,'rev-4 lighting LUT selector');
+  const sampler=rel32(view,offset+8);
+  if(!sampler)return {offset,inputCommand:u32(view,offset),scaleCommand:u32(view,offset+4),sampler:null};
+  checked(bytes,sampler,0x0c,'rev-4 lighting LUT reference');
+  const type=u32(view,sampler);
+  return {
+    offset,
+    inputCommand:u32(view,offset),
+    scaleCommand:u32(view,offset+4),
+    sampler:{
+      offset:sampler,
+      type,
+      resourceName:cstr(bytes,rel32(view,sampler+4)),
+      tableName:cstr(bytes,rel32(view,sampler+8)),
+    },
+  };
+}
+
+function readRev4FragmentLightingTable(bytes,view,fragmentOffset){
+  const table=rel32(view,fragmentOffset+0x2c);
+  if(!table)return null;
+  checked(bytes,table,0x18,'rev-4 fragment-lighting table');
+  const names=['reflectanceR','reflectanceG','reflectanceB','distribution0','distribution1','fresnel'];
+  const out={offset:table};
+  for(let i=0;i<names.length;i++)out[names[i]]=readRev4LightingReference(bytes,view,rel32(view,table+i*4));
+  return out;
+}
+
 function readFragmentShaderState(bytes,view,materialOffset){
   const offset=rel32(view,materialOffset+0x2c8);
   if(!offset)return null;
@@ -235,6 +265,7 @@ function readFragmentShaderState(bytes,view,materialOffset){
     bumpMode:u32(view,offset+0x20),
     bumpRenormalize:u32(view,offset+0x24)!==0,
   };
+  const fragmentLightingTable=readRev4FragmentLightingTable(bytes,view,offset);
   const expectedHeaders=[0x804f00c0,0x804f00c8,0x804f00d0,0x804f00d8,0x804f00f0,0x804f00f8];
   const stages=[];
   for(let i=0;i<6;i++){
@@ -259,7 +290,7 @@ function readFragmentShaderState(bytes,view,materialOffset){
   const alphaParam=u32(view,offset+0xd8),alphaHeader=u32(view,offset+0xdc);
   if(alphaHeader!==0x000f0104)throw new Error(`Unexpected Hopper alpha-test command 0x${alphaHeader.toString(16)}.`);
   return {
-    offset,fragmentLighting,stages,
+    offset,fragmentLighting,fragmentLightingTable,stages,
     alphaTest:{
       enabled:(alphaParam&1)!==0,
       function:(alphaParam>>>4)&7,
