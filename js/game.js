@@ -6,8 +6,8 @@ import {
 } from './runtime.js';
 
 export class HopperGame {
-  constructor(host,assets,models,animations,program,callbacks={}) {
-    this.host=host;this.assets=assets;this.models=models;this.animations=animations;this.program=program;this.callbacks=callbacks;
+  constructor(host,assets,models,animations,renderResources,program,callbacks={}) {
+    this.host=host;this.assets=assets;this.models=models;this.animations=animations;this.renderResources=renderResources;this.program=program;this.callbacks=callbacks;
     this.renderer=new THREE.WebGLRenderer({antialias:true,alpha:false,powerPreference:'high-performance'});
     this.renderer.setPixelRatio(Math.min(devicePixelRatio,2));
     this.renderer.shadowMap.enabled=true;this.renderer.shadowMap.type=THREE.PCFSoftShadowMap;
@@ -54,7 +54,7 @@ export class HopperGame {
   #makePlayer(){
     const model=this.models.get('neko_hopping_model');
     if(!model)throw new Error('The ROM did not provide neko_hopping_model.');
-    const group=createModelInstance(model,this.assets,{shadows:true});
+    const group=createModelInstance(model,this.assets,{shadows:true,renderResources:this.renderResources});
     group.name='ROM neko_hopping_model';
     this.scene.add(group);this.playerMesh=group;
     applySkeletalAnimation(this.playerMesh,this.catAnimation,this.catAnimationSlot.current,{loop:false});
@@ -101,7 +101,7 @@ export class HopperGame {
     const scaleY=this.program.floorBuilder.verticalModelScale;
     for(let row=0;row<record.rows;row++)for(let col=0;col<record.columns;col++){
       const x=gridCoordinate(record.columns,record.spacing,col),z=gridCoordinate(record.rows,record.spacing,row);
-      const tile=createModelInstance(model,this.assets,{shadows:true});
+      const tile=createModelInstance(model,this.assets,{shadows:true,renderResources:this.renderResources});
       // Translation of 0x13C1F0..0x13C21C: the 10-unit floor mesh is
       // scaled by spacing*0.1 on X/Z and 0.4 on Y.
       tile.scale.set(scaleXZ,scaleY,scaleXZ);
