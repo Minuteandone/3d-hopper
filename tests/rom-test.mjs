@@ -3,6 +3,7 @@ import { createHash } from 'node:crypto';
 import { HopperRom } from '../js/rom.js';
 import { parseTextures, decodeTexture, textureMapFromRom } from '../js/cgfx.js';
 import { decodeBcstm } from '../js/audio.js';
+import { evaluateTexEnv } from '../js/texenv.js';
 import { parseModels } from '../js/models.js';
 import { parsePrototypeFragmentLights } from '../js/lights.js';
 import { parsePrototypeLuts, samplePrototypeAbsoluteLut } from '../js/luts.js';
@@ -135,6 +136,27 @@ if(nekoStage0?.colorMode!==3||nekoStage0?.alphaMode!==1||
 if(nekoStage1?.colorMode!==2||nekoStage1?.alphaMode!==2||
    JSON.stringify(nekoStage1.colorSources.slice(0,2))!=='[2,15]'||
    JSON.stringify(nekoStage1.alphaSources.slice(0,2))!=='[15,3]')throw new Error('nekopper TexEnv stage 1 mismatch');
+for(const [label,mat] of [['hopping',hoppingMat],['nekopper',nekopperMat]]){
+  for(const stage of mat.fragmentShader.stages){
+    if(JSON.stringify(stage.colorModifiers)!=='[0,0,0]'||JSON.stringify(stage.alphaModifiers)!=='[0,0,0]')
+      throw new Error(`${label} TexEnv operands are not direct sources`);
+    if(stage.colorMultiplier!==1||stage.alphaMultiplier!==1)
+      throw new Error(`${label} TexEnv scale must be x1`);
+  }
+}
+const tevContext={
+  primaryColor:[100,120,140,160],
+  primaryFragmentColor:[80,100,120,140],
+  secondaryFragmentColor:[20,30,40,50],
+  textures:[[60,70,80,90],[200,180,160,140],[5,10,15,20]],
+  previousBuffer:[9,8,7,6],
+};
+const hoppingCombined=evaluateTexEnv(hoppingMat.fragmentShader,tevContext);
+if(JSON.stringify(hoppingCombined)!=='[12,42,72,56]')
+  throw new Error(`hopping ROM TexEnv evaluation mismatch ${JSON.stringify(hoppingCombined)}`);
+const nekopperCombined=evaluateTexEnv(nekopperMat.fragmentShader,tevContext);
+if(JSON.stringify(nekopperCombined)!=='[172,182,192,146]')
+  throw new Error(`nekopper ROM TexEnv evaluation mismatch ${JSON.stringify(nekopperCombined)}`);
 if(hoppingMat.fragmentShader?.alphaTest?.enabled||nekopperMat.fragmentShader?.alphaTest?.enabled)throw new Error('cat alpha test should be disabled');
 
 if(cat.shapes.map(s=>s.primitiveSets.map(p=>p.skinningMode)).flat().join(',')!=='2,2,2,0,0') throw new Error('cat skinning modes mismatch');
