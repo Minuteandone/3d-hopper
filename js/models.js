@@ -162,6 +162,46 @@ function readMaterialTextureRefs(bytes,view,materialOffset){
   return refs;
 }
 
+function readFragmentShaderState(bytes,view,materialOffset){
+  const offset=rel32(view,materialOffset+0x2c8);
+  if(!offset)return null;
+  checked(bytes,offset,0xe0,'prototype fragment shader state');
+
+  const expectedHeaders=[0x804f00c0,0x804f00c8,0x804f00d0,0x804f00d8,0x804f00f0,0x804f00f8];
+  const stages=[];
+  for(let i=0;i<6;i++){
+    const o=offset+0x30+i*0x1c;
+    const constant=u32(view,o);
+    const source=u32(view,o+4);
+    const address=u32(view,o+8);
+    const operands=u32(view,o+0x0c);
+    const combine=u32(view,o+0x10);
+    const constantColor=u32(view,o+0x14);
+    const scale=u32(view,o+0x18);
+    if(address!==expectedHeaders[i])throw new Error(`Unexpected Hopper TexEnv stage ${i} command 0x${address.toString(16)}.`);
+    stages.push({
+      index:i,constant,source,address,operands,combine,constantColor,scale,
+      colorSources:[source&0xf,(source>>>4)&0xf,(source>>>8)&0xf],
+      alphaSources:[(source>>>16)&0xf,(source>>>20)&0xf,(source>>>24)&0xf],
+      colorMode:combine&0xf,
+      alphaMode:(combine>>>16)&0xf,
+    });
+  }
+
+  const alphaParam=u32(view,offset+0xd8),alphaHeader=u32(view,offset+0xdc);
+  if(alphaHeader!==0x000f0104)throw new Error(`Unexpected Hopper alpha-test command 0x${alphaHeader.toString(16)}.`);
+  return {
+    offset,stages,
+    alphaTest:{
+      enabled:(alphaParam&1)!==0,
+      function:(alphaParam>>>4)&7,
+      reference:(alphaParam>>>8)&0xff,
+      commandParam:alphaParam,
+      commandHeader:alphaHeader,
+    },
+  };
+}
+
 function readModel(bytes,view,offset){
   checked(bytes,offset,0xd8,'CMDL');
   if(fourcc(bytes,offset+4)!=='CMDL')throw new Error(`CMDL missing at 0x${offset.toString(16)}.`);
@@ -191,6 +231,7 @@ function readModel(bytes,view,offset){
       name:entry.name,offset:o,revision,
       textureRefs:readMaterialTextureRefs(bytes,view,o),
       rasterization:{cullMode,commandParam:cullCommandParam,commandHeader:cullCommandHeader},
+      fragmentShader:readFragmentShaderState(bytes,view,o),
       blend:{mode:blendMode,enabled:blendEnabled,colorSource,colorDestination,command1:blendCommand1,command3:blendCommand3},
     };
   });
