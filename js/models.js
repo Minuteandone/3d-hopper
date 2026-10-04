@@ -317,12 +317,14 @@ function readModel(bytes,view,offset){
     const textureMappers=readMaterialTextureMappers(bytes,view,o);
     const textureRefs=textureMappers.map(m=>m.textureName);
     const fragmentShader=readFragmentShaderState(bytes,view,o);
+    const lightSetIndex=u32(view,o+0x2d8);
     const visibleColorMapper=firstColorTextureMapper(fragmentShader);
     const visibleTextureCoordinate=Number.isInteger(visibleColorMapper)
       ?textureCoordinators[textureCoordinateIndexForMapper(texCoordConfig,visibleColorMapper)]??null
       :null;
     return {
       name:entry.name,offset:o,revision,flags:materialFlags,materialColor,
+      lightSetIndex,
       texCoordConfig,textureCoordinators,
       textureMappers,textureRefs,
       visibleColorMapper,visibleTextureCoordinate,
