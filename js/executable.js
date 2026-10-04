@@ -232,6 +232,19 @@ export function liftHopperProgram(romOrBuffer){
   };
   for(const stage of controls.stageSetup)stage.controlHeadingDegrees=stage.orientation[2];
 
+  const viewController={
+    rebuildAddress:0x15eaec,
+    projectionBuilderAddress:0x15ea34,
+    affineInverseAddress:0x15e784,
+    // 0x15EAEC maintains three synchronized render views selected by
+    // 1024 / 1040 / 0x401. Each view consists of:
+    //   64-byte projection, 48-byte view, 48-byte inverse-view(camera world).
+    selectors:[1024,1040,0x401],
+    projectionOffsets:[136,200,264],
+    viewOffsets:[328,376,424],
+    inverseViewOffsets:[472,520,568],
+  };
+
   const physics={
     gravityPerUpdate:exe.readF32(0x13cce4),
     state2GravityPerUpdate:exe.readF32(0x13ccf8),
@@ -282,10 +295,10 @@ export function liftHopperProgram(romOrBuffer){
       title:exe.meta.title,sceneName:exe.readString(sceneNamePtr),sceneNamePtr,factoryAddress:factory,
       routines:{
         floorBuilder:0x13c034,gameplayUpdate:0x13c81c,stageConstruction:0x13f550,
-        stateSetup:0x1517dc,stageGlobalInitializer:STAGE_GLOBAL_INITIALIZER,startupSetup:0x13f8c0,movingFloorUpdate:0x13dd58,endingUpdate:0x13e630,endingReset:0x13b74c,
+        stateSetup:0x1517dc,stageGlobalInitializer:STAGE_GLOBAL_INITIALIZER,startupSetup:0x13f8c0,movingFloorUpdate:0x13dd58,endingUpdate:0x13e630,endingReset:0x13b74c,viewControllerRebuild:0x15eaec,
       },
     },
-    stages,startupFloor,controls,physics,ending,floorBuilder,
+    stages,startupFloor,controls,viewController,physics,ending,floorBuilder,
     initialState:{stageIndex:0,stage2ExtraCounter:2},
     executable:exe,
   };
