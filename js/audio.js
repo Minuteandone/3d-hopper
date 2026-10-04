@@ -143,7 +143,6 @@ export class HopperAudio {
     this.buffers = new Map();
     this.decoded = new Map();
     this.bgm = null;
-    this.oneShot = null;
     this.muted = false;
   }
 
@@ -178,7 +177,6 @@ export class HopperAudio {
     this.muted = !!muted;
     if (this.muted) {
       this.#stop(this.bgm); this.bgm = null;
-      this.#stop(this.oneShot); this.oneShot = null;
     }
   }
 
@@ -190,23 +188,7 @@ export class HopperAudio {
     return false;
   }
 
-  playCongrats() {
-    this.#stop(this.bgm); this.bgm = null;
-    this.#stop(this.oneShot); this.oneShot = null;
-    const path = 'sound/stream/HOPPER_BGM_CONGRATS.bcstm';
-    if (this.muted || !this.rom.has(path)) return;
-
-    const context = this.#context();
-    const source = context.createBufferSource();
-    source.buffer = this.#buffer(path);
-    source.connect(context.destination);
-    source.start();
-    source.onended = () => { if (this.oneShot === source) this.oneShot = null; };
-    this.oneShot = source;
-  }
-
   stop() {
     this.#stop(this.bgm); this.bgm = null;
-    this.#stop(this.oneShot); this.oneShot = null;
   }
 }
