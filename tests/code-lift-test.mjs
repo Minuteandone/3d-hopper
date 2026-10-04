@@ -20,7 +20,7 @@ eq(p.stages[3].records.map(r=>r.position),[[0,0,0],[8,0,-16],[16,0,-32]],'stage 
 eq(p.stages[3].records[1].offset,[-8,0,8],'moving floor vector');
 if(p.stages[3].records[1].parameter!==720||p.stages[3].records[1].flag!==1)throw new Error('moving floor metadata mismatch');
 if(!close(p.physics.gravityPerUpdate,.012)||!close(p.physics.state2GravityPerUpdate,.006)||!close(p.physics.state2DisplacementScale,.5)||!close(p.physics.landingBouncePerUpdate,.42)||!close(p.physics.airVelocityLerp,.03))throw new Error('motion constants mismatch');
-if(!close(p.physics.horizontalCollisionSize,.8)||!close(p.physics.upperCollisionOffset,4.25)||!close(p.physics.spawnClearance,7.35)||!close(p.physics.failY,-25)||!close(p.physics.verticalCollisionEpsilon,.0001,1e-7))throw new Error('runtime constants mismatch');
+if(!close(p.physics.horizontalCollisionSize,.8)||!close(p.physics.upperHorizontalCollisionSize,1)||!close(p.physics.upperCollisionLength,4.25)||!close(p.physics.upperLeanInputScale,.2)||!close(p.physics.spawnClearance,7.35)||!close(p.physics.failY,-25)||!close(p.physics.verticalCollisionEpsilon,.0001,1e-7))throw new Error('runtime constants mismatch');
 if(!close(p.floorBuilder.collisionHeight,.4)||!close(p.floorBuilder.verticalModelScale,.4)||!close(p.floorBuilder.tileModelScale,.1))throw new Error('floor-builder scale/collision constants mismatch');
 if(gridCoordinate(3,8,0)!==-8||gridCoordinate(3,8,1)!==0||gridCoordinate(3,8,2)!==8)throw new Error('translated grid math mismatch');
 const mover=p.stages[3].records[1];
@@ -31,6 +31,7 @@ if(!close(p.ending.risePerUpdate,.42)||p.ending.introUpdates!==60||p.ending.star
 if(p.ending.starShowerEffectSlot!==5||p.ending.starShowerY!==65||p.ending.thanksSceneName!=='Thanks'||p.ending.state5FadeArgument!==30)throw new Error('ending resource/scene mapping mismatch');
 eq(p.ending.frame60Controller,[24,24,47,.5],'ending frame-60 controller values');
 if(p.ending.followYLimit!==61||!close(p.ending.followYLerp,.15))throw new Error('ending follow-camera constants mismatch');
+if(!close(p.viewController.followYLerp,.15))throw new Error('normal view follow lerp mismatch');
 
 if(!close(p.controls.degreesToTrigUnits,.7111111283))throw new Error('control degree conversion mismatch');
 eq(p.controls.stageSetup.map(s=>s.orientation),[[65,-40,0],[60,-20,0],[60,-50,25],[65,-40,0]],'stage orientation setup');
