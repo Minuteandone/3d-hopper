@@ -202,6 +202,24 @@ function readFragmentShaderState(bytes,view,materialOffset){
   };
 }
 
+const TEXENV_INPUT_COUNTS=[1,2,2,2,3,2,2,2,3,3];
+
+/**
+ * Return the first physical texture mapper (0..2) that an active TexEnv
+ * color operation actually reads. Source IDs 3/4/5 are Texture0/1/2.
+ * Unused padding source nibbles are ignored according to combiner mode.
+ */
+export function firstColorTextureMapper(fragmentShader){
+  if(!fragmentShader)return null;
+  for(const stage of fragmentShader.stages){
+    const count=TEXENV_INPUT_COUNTS[stage.colorMode]??3;
+    for(const source of stage.colorSources.slice(0,count)){
+      if(source>=3&&source<=5)return source-3;
+    }
+  }
+  return null;
+}
+
 function readModel(bytes,view,offset){
   checked(bytes,offset,0xd8,'CMDL');
   if(fourcc(bytes,offset+4)!=='CMDL')throw new Error(`CMDL missing at 0x${offset.toString(16)}.`);
@@ -227,11 +245,14 @@ function readModel(bytes,view,offset){
     const blendEnabled=((blendCommand1>>>8)&0xff)===1;
     const colorSource=(blendCommand3>>>16)&0xf;
     const colorDestination=(blendCommand3>>>20)&0xf;
+    const textureRefs=readMaterialTextureRefs(bytes,view,o);
+    const fragmentShader=readFragmentShaderState(bytes,view,o);
     return {
       name:entry.name,offset:o,revision,
-      textureRefs:readMaterialTextureRefs(bytes,view,o),
+      textureRefs,
+      visibleColorMapper:firstColorTextureMapper(fragmentShader),
       rasterization:{cullMode,commandParam:cullCommandParam,commandHeader:cullCommandHeader},
-      fragmentShader:readFragmentShaderState(bytes,view,o),
+      fragmentShader,
       blend:{mode:blendMode,enabled:blendEnabled,colorSource,colorDestination,command1:blendCommand1,command3:blendCommand3},
     };
   });
