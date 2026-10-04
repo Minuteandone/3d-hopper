@@ -5,8 +5,6 @@ import {
   createGameState,activeStageRecords,createFloorRuntime,tickFloorRuntime,noteFall,findStartRecord,updateHorizontalVelocity,intersectFloorTop,intersectFloorBottom,createEndingRuntime,tickEndingRuntime,applyLowerSideCollision,updateUpperCollisionPoint,updateViewTarget,
 } from './runtime.js';
 
-const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
-
 export class HopperGame {
   constructor(host,assets,models,program,callbacks={}) {
     this.host=host;this.assets=assets;this.models=models;this.program=program;this.callbacks=callbacks;
