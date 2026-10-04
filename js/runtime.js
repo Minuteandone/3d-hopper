@@ -122,3 +122,47 @@ export function intersectFloorBottom(floor,start,end,horizontalCollisionSize){
   if(!hit||!floorContainsHorizontalPoint(floor,hit.x,hit.z,horizontalCollisionSize))return null;
   return hit;
 }
+
+/** State-3 counters reset by 0x13B74C before the final ending update begins. */
+export function createEndingRuntime(){
+  return {
+    mainCounter:0,
+    postShowerCounter:0,
+    state:3,
+    starShowerStarted:false,
+  };
+}
+
+/**
+ * Counter/state portion of dedicated ending updater 0x13E630.
+ * Rendering, quaternion interpolation, camera/controller writes, particle
+ * activation, and sound calls are surfaced as events rather than guessed here.
+ */
+export function tickEndingRuntime(runtime,ending,{confirm=false}={}){
+  if(runtime.state!==3)return {state:runtime.state,events:[],riseY:0};
+  const events=[];
+  const frame=runtime.mainCounter;
+
+  if(frame===ending.introUpdates)events.push({type:'frame60-controller',values:[...ending.frame60Controller]});
+  if(frame===ending.starShowerUpdate){
+    runtime.starShowerStarted=true;
+    events.push({type:'starshower',slot:ending.starShowerEffectSlot,y:ending.starShowerY});
+  }
+
+  if(frame>ending.starShowerUpdate){
+    if(confirm){
+      runtime.state=5;
+      events.push({type:'enter-state5',reason:'confirm'});
+      return {state:runtime.state,events,riseY:ending.risePerUpdate};
+    }
+    runtime.postShowerCounter++;
+    if(runtime.postShowerCounter>=ending.postShowerTimeoutUpdates){
+      runtime.state=5;
+      events.push({type:'enter-state5',reason:'timeout'});
+      return {state:runtime.state,events,riseY:ending.risePerUpdate};
+    }
+  }
+
+  runtime.mainCounter++;
+  return {state:runtime.state,events,riseY:ending.risePerUpdate};
+}
