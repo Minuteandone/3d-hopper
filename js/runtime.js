@@ -219,3 +219,38 @@ export function applyLowerSideCollision(lower,upper,movement,floors,horizontalCo
   next.z=z;
   return next;
 }
+
+/**
+ * Collision-body portion of 0x13D5E0..0x13D7E4.
+ * Builds the target upper collision point from transformed control input,
+ * then sweeps the previous upper point upward through floor bottoms.
+ */
+export function updateUpperCollisionPoint(lower,previousUpper,input,floors,physics){
+  const leanX=input.x*physics.upperLeanInputScale;
+  const leanZ=input.z*physics.upperLeanInputScale;
+  const leanLength=Math.hypot(leanX,leanZ);
+  const up=Math.sqrt(Math.max(0,1-leanLength));
+  const length=physics.upperCollisionLength;
+  let target={
+    x:lower.x+leanX*length,
+    y:lower.y+up*length,
+    z:lower.z+leanZ*length,
+  };
+
+  if(target.y>previousUpper.y){
+    for(const floor of floors){
+      const hit=intersectFloorBottom(
+        floor,previousUpper,target,physics.upperHorizontalCollisionSize
+      );
+      if(!hit)continue;
+      let dx=hit.x-lower.x,dy=hit.y-lower.y,dz=hit.z-lower.z;
+      const d=Math.hypot(dx,dy,dz);
+      if(d>length&&d>0){
+        const scale=length/d;dx*=scale;dy*=scale;dz*=scale;
+      }
+      target={x:lower.x+dx,y:lower.y+dy,z:lower.z+dz};
+      break;
+    }
+  }
+  return target;
+}
