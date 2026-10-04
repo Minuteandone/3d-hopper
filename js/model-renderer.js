@@ -36,21 +36,36 @@ function copyAttribute(geometry,name,attr,itemSize){
   if(!attr)return;
   geometry.setAttribute(name,new THREE.BufferAttribute(new Float32Array(attr.values),itemSize));
 }
+function bindWorldForPrimitiveSet(primitiveSet,bones){
+  if(!bones||primitiveSet.skinningMode===2||!primitiveSet.relatedBones.length)return null;
+  const jointId=primitiveSet.relatedBones[0],boneIndex=bones.jointToIndex.get(jointId);
+  if(boneIndex===undefined)return null;
+  return matrix4From34(bones.source[boneIndex].inverseBaseMatrix).invert();
+}
+function copyNormalAttribute(geometry,shape,primitiveSet,bones){
+  const attr=shape.byUsage.get(VertexUsage.Normal);if(!attr)return;
+  const values=new Float32Array(attr.count*3);
+  const bindWorld=bindWorldForPrimitiveSet(primitiveSet,bones);
+  const normalMatrix=bindWorld?new THREE.Matrix3().getNormalMatrix(bindWorld):null;
+  const v=new THREE.Vector3();
+  for(let i=0;i<attr.count;i++){
+    v.set(
+      attr.values[i*attr.components],
+      attr.components>1?attr.values[i*attr.components+1]:0,
+      attr.components>2?attr.values[i*attr.components+2]:0
+    );
+    if(normalMatrix)v.applyMatrix3(normalMatrix).normalize();
+    values[i*3]=v.x;values[i*3+1]=v.y;values[i*3+2]=v.z;
+  }
+  geometry.setAttribute('normal',new THREE.BufferAttribute(values,3));
+}
 function copyPositionAttribute(geometry,shape,primitiveSet,bones){
   const attr=shape.byUsage.get(VertexUsage.Position);if(!attr)return;
   const values=new Float32Array(attr.count*3);
   const [ox,oy,oz]=shape.positionOffset;
-  let bindWorld=null;
-  if(bones&&primitiveSet.skinningMode!==2&&primitiveSet.relatedBones.length){
-    const jointId=primitiveSet.relatedBones[0];
-    const boneIndex=bones.jointToIndex.get(jointId);
-    if(boneIndex!==undefined){
-      // Non-smooth CGFX pieces are authored in the related bone's local bind
-      // space. Bake that bind transform into model space before applying the
-      // runtime inverse-bind animation delta.
-      bindWorld=matrix4From34(bones.source[boneIndex].inverseBaseMatrix).invert();
-    }
-  }
+  // Non-smooth CGFX pieces are authored in a single related bone's local
+  // bind space. Bake that transform before runtime inverse-bind animation.
+  const bindWorld=bindWorldForPrimitiveSet(primitiveSet,bones);
   const v=new THREE.Vector3();
   for(let i=0;i<attr.count;i++){
     v.set(
@@ -70,11 +85,15 @@ function skinAttributes(shape,primitiveSet,bones){
   for(let i=0;i<count;i++){
     if(boneAttr){
       let sum=0;
-      for(let j=0;j<Math.min(4,boneAttr.components);j++){
+      const components=primitiveSet.skinningMode===2?Math.min(4,boneAttr.components):1;
+      for(let j=0;j<components;j++){
         const paletteIndex=Math.round(boneAttr.values[i*boneAttr.components+j]);
         const jointId=palette[paletteIndex]??palette[0]??paletteIndex;
         indices[i*4+j]=bones.jointToIndex.get(jointId)??0;
-        const w=weightAttr?.values[i*weightAttr.components+j]??(j===0?1:0);weights[i*4+j]=w;sum+=w;
+        const w=primitiveSet.skinningMode===2
+          ?(weightAttr?.values[i*weightAttr.components+j]??(j===0?1:0))
+          :1;
+        weights[i*4+j]=w;sum+=w;
       }
       if(sum>0&&Math.abs(sum-1)>.0001)for(let j=0;j<4;j++)weights[i*4+j]/=sum;
     }else{const jointId=palette[0]??0;indices[i*4]=bones.jointToIndex.get(jointId)??0;weights[i*4]=1;}
@@ -84,7 +103,7 @@ function skinAttributes(shape,primitiveSet,bones){
 function makeGeometry(shape,primitiveSet,indexStream,bones){
   const geometry=new THREE.BufferGeometry();
   copyPositionAttribute(geometry,shape,primitiveSet,bones);
-  copyAttribute(geometry,'normal',shape.byUsage.get(VertexUsage.Normal),3);
+  copyNormalAttribute(geometry,shape,primitiveSet,bones);
   copyAttribute(geometry,'uv',shape.byUsage.get(VertexUsage.TextureCoordinate0),2);
   const skin=skinAttributes(shape,primitiveSet,bones);
   if(skin){geometry.setAttribute('skinIndex',new THREE.Uint16BufferAttribute(skin.indices,4));geometry.setAttribute('skinWeight',new THREE.Float32BufferAttribute(skin.weights,4));}
