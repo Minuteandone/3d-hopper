@@ -34,6 +34,23 @@ if(cat.materials[0]?.textureRefs[0]!=='hopping'||!cat.materials[1]?.textureRefs.
 if(cat.materials[0]?.blend?.colorSource!==1||cat.materials[0]?.blend?.colorDestination!==0) throw new Error('hopping material blend state mismatch');
 if(cat.materials[1]?.blend?.colorSource!==1||cat.materials[1]?.blend?.colorDestination!==0) throw new Error('nekopper material blend state mismatch');
 if(cat.shapes.map(s=>s.primitiveSets.map(p=>p.skinningMode)).flat().join(',')!=='2,2,2,0,0') throw new Error('cat skinning modes mismatch');
+const catSets=cat.shapes.flatMap((shape,shapeIndex)=>shape.primitiveSets.map(ps=>({shapeIndex,shape,ps})));
+for(const {shapeIndex,shape,ps} of catSets){
+  const hasBoneIndex=shape.byUsage.has(7),hasBoneWeight=shape.byUsage.has(8);
+  if(ps.skinningMode===2&&(!hasBoneIndex||!hasBoneWeight))throw new Error(`shape ${shapeIndex}: smooth skinning lacks bone streams`);
+  if(ps.skinningMode===0&&(hasBoneIndex||hasBoneWeight))throw new Error(`shape ${shapeIndex}: non-smooth primitive unexpectedly has bone streams`);
+}
+if(JSON.stringify(cat.shapes[1].primitiveSets[0].relatedBones)!=='[2]'||
+   JSON.stringify(cat.shapes[2].primitiveSets[0].relatedBones)!=='[23]')throw new Error('single-bone primitive palettes mismatch');
+const expectedShapeOffsets=[
+  [0.0000080125,2.42500997,-0.286096007],
+  [-0.00603182,2.50541997,0.0272913],
+  [0,0.46392599,0],
+];
+for(let i=0;i<3;i++)for(let axis=0;axis<3;axis++)
+  if(Math.abs(cat.shapes[i].positionOffset[axis]-expectedShapeOffsets[i][axis])>1e-5)
+    throw new Error(`shape ${i} position offset mismatch`);
+
 for(const shape of cat.shapes)for(const ps of shape.primitiveSets)for(const prim of ps.primitives)for(const stream of prim.indexStreams)if(stream.primitiveMode!==0)throw new Error('unexpected cat primitive mode');
 const floor1=parseModels(rom.get('gfx/hopper_map_floor01.bcmdl')).find(m=>m.name==='hopper_floor01_model');
 const floor2=parseModels(rom.get('gfx/hopper_map_floor02.bcmdl')).find(m=>m.name==='hopper_floor02_model');
