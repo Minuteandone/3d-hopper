@@ -12,10 +12,10 @@ const dot=(a,b)=>a[0]*b[0]+a[1]*b[1]+a[2]*b[2];
 const length=v=>Math.hypot(v[0],v[1],v[2]);
 const normalize=v=>{const n=length(v);return n>0?[v[0]/n,v[1]/n,v[2]/n]:[0,0,0];};
 const add3=(a,b)=>[a[0]+b[0],a[1]+b[1],a[2]+b[2]];
-const mulColor=(a,b)=>[a[0]*b[0],a[1]*b[1],a[2]*b[2],a[3]*b[3]];
-const scaleColor=(a,s)=>[a[0]*s,a[1]*s,a[2]*s,a[3]*s];
-const addColor=(a,b)=>[a[0]+b[0],a[1]+b[1],a[2]+b[2],a[3]+b[3]];
-const clampColor=a=>a.map(clamp01);
+const mulRgb=(a,b)=>[a[0]*b[0],a[1]*b[1],a[2]*b[2]];
+const scaleRgb=(a,s)=>[a[0]*s,a[1]*s,a[2]*s];
+const addRgb=(a,b)=>[a[0]+b[0],a[1]+b[1],a[2]+b[2]];
+const clampRgb=a=>a.map(clamp01);
 
 function resolveTable(selector,lutMap){
   if(!selector?.sampler)return null;
@@ -89,34 +89,34 @@ export function evaluateFragmentLighting({
   const ln=twoSidedDiffuse?Math.abs(cosLN):Math.max(cosLN,0);
   const vectors={normal:n,view:v,half:h,light:l,tangent,lightDirection};
 
-  let primary=addColor(colors.emission,mulColor(colors.ambient,sceneAmbient));
-  primary=addColor(primary,addColor(
-    mulColor(colors.ambient,lightAmbient),
-    scaleColor(mulColor(colors.diffuse,lightDiffuse),clamp01(ln))
+  let primary=addRgb(colors.emission,mulRgb(colors.ambient,sceneAmbient));
+  primary=addRgb(primary,addRgb(
+    mulRgb(colors.ambient,lightAmbient),
+    scaleRgb(mulRgb(colors.diffuse,lightDiffuse),clamp01(ln))
   ));
 
-  let spec0=[...colors.specular0],spec1=[...colors.specular1];
-  if(config.flags&FLAG_DISTRIBUTION0)spec0=scaleColor(spec0,sampleSelector(table?.distribution0,vectors,lutMap));
-  if(config.flags&FLAG_DISTRIBUTION1)spec1=scaleColor(spec1,sampleSelector(table?.distribution1,vectors,lutMap));
+  let spec0=colors.specular0.slice(0,3),spec1=colors.specular1.slice(0,3);
+  if(config.flags&FLAG_DISTRIBUTION0)spec0=scaleRgb(spec0,sampleSelector(table?.distribution0,vectors,lutMap));
+  if(config.flags&FLAG_DISTRIBUTION1)spec1=scaleRgb(spec1,sampleSelector(table?.distribution1,vectors,lutMap));
 
   let geometric=1;
   if(config.flags&(FLAG_GEOMETRIC0|FLAG_GEOMETRIC1)){
     const hh=Math.abs(dot(h,h));
     geometric=hh>0?ln/hh:0;
-    if(config.flags&FLAG_GEOMETRIC0)spec0=scaleColor(spec0,geometric);
-    if(config.flags&FLAG_GEOMETRIC1)spec1=scaleColor(spec1,geometric);
+    if(config.flags&FLAG_GEOMETRIC0)spec0=scaleRgb(spec0,geometric);
+    if(config.flags&FLAG_GEOMETRIC1)spec1=scaleRgb(spec1,geometric);
   }
 
   if(config.flags&FLAG_REFLECTION){
     throw new Error('Reflection LUT lighting is not used by Hopper cat materials and is not translated here yet.');
   }
 
-  let secondary=addColor(mulColor(spec0,lightSpecular0),mulColor(spec1,lightSpecular1));
-  if((config.flags&FLAG_CLAMP_HIGHLIGHT)&&cosLN<0)secondary=scaleColor(secondary,0);
+  let secondary=addRgb(mulRgb(spec0,lightSpecular0),mulRgb(spec1,lightSpecular1));
+  if((config.flags&FLAG_CLAMP_HIGHLIGHT)&&cosLN<0)secondary=scaleRgb(secondary,0);
 
   return {
-    primary:clampColor(primary),
-    secondary:clampColor(secondary),
+    primary:[...clampRgb(primary),1],
+    secondary:[...clampRgb(secondary),1],
     terms:{cosLightNormal:cosLN,geometric},
   };
 }
