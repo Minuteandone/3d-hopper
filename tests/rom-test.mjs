@@ -53,6 +53,23 @@ for(const bone of cat.skeleton.bones){
 }
 
 if(cat.materials[0]?.textureRefs[0]!=='hopping'||!cat.materials[1]?.textureRefs.includes('nekopper')) throw new Error('cat material texture references were not recovered');
+
+const closeColor=(actual,expected,label)=>{
+  if(!actual||actual.length!==expected.length)throw new Error(`${label}: missing color`);
+  for(let i=0;i<expected.length;i++)if(Math.abs(actual[i]-expected[i])>1e-5)throw new Error(`${label}[${i}] ${actual[i]} != ${expected[i]}`);
+};
+if(cat.materials[0]?.flags!==1||cat.materials[1]?.flags!==1)throw new Error('cat materials must have fragment lighting enabled');
+closeColor(cat.materials[0].materialColor.emission,[0,0,0,0],'hopping emission');
+closeColor(cat.materials[0].materialColor.ambient,[1,1,1,1],'hopping ambient');
+closeColor(cat.materials[0].materialColor.diffuse,[1,.67,.67,1],'hopping diffuse');
+closeColor(cat.materials[0].materialColor.specular0,[.67,.18,1,0],'hopping specular0');
+closeColor(cat.materials[0].materialColor.specular1,[0,0,0,0],'hopping specular1');
+closeColor(cat.materials[1].materialColor.emission,[.33,.22,.12,0],'nekopper emission');
+closeColor(cat.materials[1].materialColor.ambient,[1,1,1,1],'nekopper ambient');
+closeColor(cat.materials[1].materialColor.diffuse,[.23,.39,.48,1],'nekopper diffuse');
+closeColor(cat.materials[1].materialColor.specular0,[.27,.17,0,0],'nekopper specular0');
+closeColor(cat.materials[1].materialColor.specular1,[.22,.17,.04,0],'nekopper specular1');
+
 if(cat.materials[0]?.blend?.colorSource!==1||cat.materials[0]?.blend?.colorDestination!==0) throw new Error('hopping material blend state mismatch');
 if(cat.materials[1]?.blend?.colorSource!==1||cat.materials[1]?.blend?.colorDestination!==0) throw new Error('nekopper material blend state mismatch');
 if(cat.materials[0]?.rasterization?.cullMode!==2||cat.materials[1]?.rasterization?.cullMode!==2) throw new Error('cat culling mode mismatch');
