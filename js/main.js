@@ -6,11 +6,13 @@ import { emitterMapFromRom } from './emitters.js';
 import { liftHopperProgram } from './executable.js';
 import { HopperGame } from './game.js';
 import { bcsarFromRom } from './bcsar.js';
+import { fragmentLightMapFromRom } from './lights.js';
+import { prototypeLutMapFromRom } from './luts.js';
 
 const $=s=>document.querySelector(s);
 const boot=$('#boot'),titleScreen=$('#titleScreen'),thanks=$('#thanks'),errorBox=$('#error');
 const touch=$('#touchControls'),status=$('#romStatus');
-let rom=null,assets=null,models=null,animations=null,emitters=null,soundCatalog=null,program=null,game=null;
+let rom=null,assets=null,models=null,animations=null,emitters=null,soundCatalog=null,fragmentLights=null,luts=null,program=null,game=null;
 
 function show(el,on=true){el.classList.toggle('hidden',!on);}
 function fail(err){console.error(err);errorBox.textContent=err instanceof Error?err.message:String(err);show(errorBox,true);setTimeout(()=>show(errorBox,false),8000);}
@@ -28,13 +30,13 @@ async function openRom(file){
     program=liftHopperProgram(rom);
     status.textContent=`ARM build verified · ${rom.files.size} files · translating assets…`;
     await new Promise(r=>requestAnimationFrame(r));
-    assets=textureMapFromRom(rom);models=modelMapFromRom(rom);animations=skeletalAnimationMapFromRom(rom);emitters=emitterMapFromRom(rom);soundCatalog=bcsarFromRom(rom);
+    assets=textureMapFromRom(rom);models=modelMapFromRom(rom);animations=skeletalAnimationMapFromRom(rom);emitters=emitterMapFromRom(rom);soundCatalog=bcsarFromRom(rom);fragmentLights=fragmentLightMapFromRom(rom);luts=prototypeLutMapFromRom(rom);
     if(assets.size<10)throw new Error(`ROM loaded, but only ${assets.size} textures decoded. Is this the E3 2010 3D Hopper build?`);
     if(!models.has('neko_hopping_model')||!models.has('hopper_floor01_model')||!models.has('hopper_floor02_model'))throw new Error('Original Hopper BCMDL models could not be decoded from this ROM.');
     if(!animations.has('neko_hopping_jump'))throw new Error('Original neko_hopping_jump CANM clip could not be decoded from this ROM.');
     fillArt();
     game?.renderer?.setAnimationLoop(null);$('#viewport').replaceChildren();
-    game=new HopperGame($('#viewport'),assets,models,animations,program,{
+    game=new HopperGame($('#viewport'),assets,models,animations,{fragmentLights,luts},program,{
       onStage:(n,meta)=>{
         if(n===3&&meta.rescueCounter===0)status.textContent='Original Stage 3 rescue platform is gone (ARM counter reached 0).';
       },
@@ -53,7 +55,7 @@ async function openRom(file){
       }
     });
     game.bindTouch(touch);
-    status.textContent=`Ready · 4 descriptor stages · ${models.size} BCMDL models · ${animations.size} CANM clip · ${emitters.size} PEMT emitters · ${assets.size} textures · ${soundCatalog.sounds.length} BCSAR sounds · gameplay translation incomplete`;
+    status.textContent=`Ready · 4 descriptor stages · ${models.size} BCMDL models · ${animations.size} CANM clip · ${emitters.size} PEMT emitters · ${assets.size} textures · ${fragmentLights.size} fragment light · ${luts.size} LUT resources · ${soundCatalog.sounds.length} BCSAR sounds · gameplay translation incomplete`;
     show(boot,false);show(thanks,false);show(titleScreen,true);
   }catch(e){status.textContent='ROM/code lift failed';fail(e);}
 }
