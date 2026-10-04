@@ -13,11 +13,13 @@ function makeMaterial(material,textures){
   const map=textureName?makeTexture(textures.get(textureName)):null;
   const blend=material?.blend;
   const alphaBlend=!!(blend?.enabled&&!(blend.colorSource===1&&blend.colorDestination===0));
+  const cullMode=material?.rasterization?.cullMode??0;
+  const side=cullMode===2?THREE.FrontSide:cullMode===1?THREE.BackSide:THREE.DoubleSide;
   return new THREE.MeshStandardMaterial({
     map,color:0xffffff,roughness:.9,metalness:0,
     transparent:alphaBlend,
     alphaTest:0,
-    side:THREE.DoubleSide,
+    side,
     depthWrite:true,
   });
 }
