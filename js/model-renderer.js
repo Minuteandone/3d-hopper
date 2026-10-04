@@ -43,7 +43,7 @@ function depthFuncToThree(code){
     THREE.GreaterEqualDepth,
   ][code]??THREE.LessEqualDepth;
 }
-function makeMaterial(material,textures){
+function makeMaterial(material,textures,renderResources=null){
   const mapperIndex=Number.isInteger(material?.visibleColorMapper)?material.visibleColorMapper:0;
   const mapper=material?.textureMappers?.[mapperIndex]??material?.textureMappers?.[0]??null;
   const textureName=mapper?.textureName??material?.textureRefs?.[mapperIndex]??material?.textureRefs?.[0]??null;
@@ -159,10 +159,10 @@ function makeGeometry(shape,primitiveSet,indexStream,bones){
   return geometry;
 }
 
-export function createModelInstance(model,textures,{shadows=true}={}){
+export function createModelInstance(model,textures,{shadows=true,renderResources=null}={}){
   const group=new THREE.Group();group.name=model.name;group.userData.hopperModel=model;
   const bones=buildBones(model,group);
-  const materials=model.materials.map(m=>makeMaterial(m,textures));
+  const materials=model.materials.map(m=>makeMaterial(m,textures,renderResources));
   for(const meshInfo of model.meshes){
     if(meshInfo.visible===false)continue;
     const shape=model.shapes[meshInfo.shapeIndex];if(!shape)continue;
