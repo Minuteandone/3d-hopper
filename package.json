@@ -11,6 +11,7 @@
     "test:effects": "node tests/effects-test.mjs",
     "test:bcsar": "node tests/bcsar-test.mjs",
     "test:lighting": "node tests/fragment-lighting-test.mjs",
-    "test:texenv": "node tests/texenv-test.mjs"
+    "test:texenv": "node tests/texenv-test.mjs",
+    "test:shbin": "node tests/shbin-test.mjs"
   }
 }
