@@ -263,7 +263,7 @@ export function makeLivePicaMaterial(material,textures,renderResources){
 
   const shader=new THREE.ShaderMaterial({
     uniforms,
-    vertexColors:true,
+    vertexColors:false,
     transparent:!!(material.blend?.enabled&&!(material.blend.colorSource===1&&material.blend.colorDestination===0)),
     side:makeSide(material.rasterization?.cullMode??0),
     depthTest:material.depth?.testEnabled??true,
