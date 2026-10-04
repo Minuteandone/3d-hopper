@@ -232,10 +232,24 @@ export function liftHopperProgram(romOrBuffer){
   };
   for(const stage of controls.stageSetup)stage.controlHeadingDegrees=stage.orientation[2];
 
+  const commonView={
+    near:exe.readF32(0x151b60),
+    far:exe.readF32(0x151b64),
+    frustum0:exe.readF32(0x151b68),
+    frustum1:exe.readF32(0x151b6c),
+    fov15:exe.readF32(0x151b78),
+    fov20:exe.readF32(0x151b80),
+    auxiliary2:exe.readF32(0x151b84),
+    orientation60:exe.readF32(0x151b88),
+    auxiliary62_5:exe.readF32(0x151b98),
+    auxiliary2_5:exe.readF32(0x151b9c),
+  };
   const viewController={
     rebuildAddress:0x15eaec,
     projectionBuilderAddress:0x15ea34,
     affineInverseAddress:0x15e784,
+    stereoBuilderAddress:0x106570,
+    lookAtBuilderAddress:0x1062c4,
     // 0x15EAEC maintains three synchronized render views selected by
     // 1024 / 1040 / 0x401. Each view consists of:
     //   64-byte projection, 48-byte view, 48-byte inverse-view(camera world).
@@ -245,6 +259,32 @@ export function liftHopperProgram(romOrBuffer){
     inverseViewOffsets:[472,520,568],
     followUpdateAddress:0x13e598,
     followYLerp:exe.readF32(0x13e62c),
+    stageSetup:[
+      {
+        projection:{fovDegrees:commonView.fov15,near:commonView.near,far:commonView.far,frustumParameter0:commonView.frustum0,frustumParameter1:commonView.frustum1},
+        position:[0,0,0],
+        orientationDegrees:[exe.readF32(0x151b70),exe.readF32(0x151b74),0],
+        auxiliaryPair:[commonView.auxiliary62_5,commonView.auxiliary2_5],
+      },
+      {
+        projection:{fovDegrees:commonView.fov20,near:commonView.near,far:commonView.far,frustumParameter0:commonView.frustum0,frustumParameter1:commonView.frustum1},
+        position:[0,0,0],
+        orientationDegrees:[commonView.orientation60,exe.readF32(0x151f2c),0],
+        auxiliaryPair:[exe.readF32(0x151f28),commonView.auxiliary2],
+      },
+      {
+        projection:{fovDegrees:commonView.fov20,near:commonView.near,far:commonView.far,frustumParameter0:commonView.frustum0,frustumParameter1:exe.readF32(0x151f30)},
+        position:[0,0,0],
+        orientationDegrees:[commonView.orientation60,exe.readF32(0x151f34),exe.readF32(0x151f38)],
+        auxiliaryPair:[commonView.orientation60,commonView.auxiliary2],
+      },
+      {
+        projection:{fovDegrees:commonView.fov15,near:commonView.near,far:commonView.far,frustumParameter0:commonView.frustum0,frustumParameter1:commonView.frustum1},
+        position:[0,0,0],
+        orientationDegrees:[exe.readF32(0x151b70),exe.readF32(0x151b74),0],
+        auxiliaryPair:[exe.readF32(0x151f24),commonView.auxiliary2],
+      },
+    ],
   };
 
   const physics={
