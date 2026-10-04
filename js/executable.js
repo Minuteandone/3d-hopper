@@ -182,6 +182,70 @@ export function transformControlVector(controls,stageIndex,x,z){
   return {x:cos*x+sin*z,z:-sin*x+cos*z};
 }
 
+function buildPrototypeViewRotation(controls,aDegrees,bDegrees,cDegrees){
+  const a=prototypeSinCos(controls.trigTable,aDegrees*controls.degreesToTrigUnits);
+  const b=prototypeSinCos(controls.trigTable,bDegrees*controls.degreesToTrigUnits);
+  const c=prototypeSinCos(controls.trigTable,cDegrees*controls.degreesToTrigUnits);
+  const sa=a.sin,ca=a.cos,sb=b.sin,cb=b.cos,sc=c.sin,cc=c.cos;
+  const m=new Float64Array(12);
+  m[0]=cc*cb;
+  m[4]=sc*cb;
+  m[8]=-sb;
+  const t6=sa*cc;
+  const t2=ca*cc;
+  const t1=ca*sc;
+  m[1]=t6*sb-t1;
+  m[6]=t1*sb-t6;
+  const t1b=sa*sc;
+  m[2]=t1b+t2*sb;
+  m[5]=t2+t1b*sb;
+  m[9]=cb*sa;
+  m[10]=cb*ca;
+  return m;
+}
+
+function multiplyPrototypeAffine(a,b){
+  const o=new Float64Array(12);
+  o[0]=b[0]*a[0]+b[4]*a[1]+b[8]*a[2];
+  o[1]=b[1]*a[0]+b[5]*a[1]+b[9]*a[2];
+  o[2]=b[2]*a[0]+b[6]*a[1]+b[10]*a[2];
+  o[3]=b[3]*a[0]+b[7]*a[1]+b[11]*a[2]+a[3];
+  o[4]=b[0]*a[4]+b[4]*a[5]+b[8]*a[6];
+  o[5]=b[1]*a[4]+b[5]*a[5]+b[9]*a[6];
+  o[6]=b[2]*a[4]+b[6]*a[5]+b[10]*a[6];
+  o[7]=b[3]*a[4]+b[7]*a[5]+b[11]*a[6]+a[7];
+  o[8]=b[0]*a[8]+b[4]*a[9]+b[8]*a[10];
+  o[9]=b[1]*a[8]+b[5]*a[9]+b[9]*a[10];
+  o[10]=b[2]*a[8]+b[6]*a[9]+b[10]*a[10];
+  o[11]=b[3]*a[8]+b[7]*a[9]+b[11]*a[10]+a[11];
+  return o;
+}
+
+/**
+ * Center (mono) eye position from 0x15EAEC before the stereo splitter at
+ * 0x106570 creates left/right eye views.
+ */
+export function computeCenterCameraPose(controls,viewController,stageIndex,target,secondaryAngleDegrees=0){
+  const stage=viewController.stageSetup[stageIndex]??viewController.stageSetup[0];
+  const first=buildPrototypeViewRotation(
+    controls,stage.pitchDegrees,stage.headingDegrees,0
+  );
+  const second=buildPrototypeViewRotation(
+    controls,secondaryAngleDegrees,stage.headingDegrees,secondaryAngleDegrees
+  );
+  const composed=multiplyPrototypeAffine(first,second);
+  const distance=stage.distance;
+  return {
+    target:{x:target.x,y:target.y,z:target.z},
+    eye:{
+      x:target.x+composed[2]*distance,
+      y:target.y+composed[6]*distance,
+      z:target.z+composed[10]*distance,
+    },
+    projection:{...stage.projection},
+  };
+}
+
 export function gridCoordinate(count,spacing,index){
   return 0.5*(1-count)*spacing+index*spacing;
 }
@@ -220,17 +284,15 @@ export function liftHopperProgram(romOrBuffer){
   const controls={
     degreesToTrigUnits:exe.readF32(CONTROL_DEGREES_SCALE_VA),
     trigTable,
-    // 0x1517DC writes these orientation triples into game+4. 0x1516CC
-    // consumes only the third component when rotating analog input.
+    // 0x1516CC rotates analog input by the controller heading at +0x58.
     stageSetup:[
-      {orientation:[exe.readF32(0x151b70),exe.readF32(0x151b74),exe.readF32(0x151b7c)]},
-      {orientation:[exe.readF32(0x151b88),exe.readF32(0x151f2c),exe.readF32(0x151b7c)]},
-      {orientation:[exe.readF32(0x151b88),exe.readF32(0x151f34),exe.readF32(0x151f38)]},
-      {orientation:[exe.readF32(0x151b70),exe.readF32(0x151b74),exe.readF32(0x151b7c)]},
+      {controlHeadingDegrees:exe.readF32(0x151b7c)},
+      {controlHeadingDegrees:exe.readF32(0x151b7c)},
+      {controlHeadingDegrees:exe.readF32(0x151f38)},
+      {controlHeadingDegrees:exe.readF32(0x151b7c)},
     ],
     sourceAddress:0x1516cc,
   };
-  for(const stage of controls.stageSetup)stage.controlHeadingDegrees=stage.orientation[2];
 
   const commonView={
     near:exe.readF32(0x151b60),
@@ -240,7 +302,7 @@ export function liftHopperProgram(romOrBuffer){
     fov15:exe.readF32(0x151b78),
     fov20:exe.readF32(0x151b80),
     auxiliary2:exe.readF32(0x151b84),
-    orientation60:exe.readF32(0x151b88),
+    distance60:exe.readF32(0x151b88),
     auxiliary62_5:exe.readF32(0x151b98),
     auxiliary2_5:exe.readF32(0x151b9c),
   };
@@ -262,26 +324,38 @@ export function liftHopperProgram(romOrBuffer){
     stageSetup:[
       {
         projection:{fovDegrees:commonView.fov15,near:commonView.near,far:commonView.far,frustumParameter0:commonView.frustum0,frustumParameter1:commonView.frustum1},
-        position:[0,0,0],
-        orientationDegrees:[exe.readF32(0x151b70),exe.readF32(0x151b74),0],
+        target:[0,0,0],
+        distance:exe.readF32(0x151b70),
+        pitchDegrees:exe.readF32(0x151b74),
+        headingDegrees:exe.readF32(0x151b7c),
+        secondaryAngleDegrees:0,
         auxiliaryPair:[commonView.auxiliary62_5,commonView.auxiliary2_5],
       },
       {
         projection:{fovDegrees:commonView.fov20,near:commonView.near,far:commonView.far,frustumParameter0:commonView.frustum0,frustumParameter1:commonView.frustum1},
-        position:[0,0,0],
-        orientationDegrees:[commonView.orientation60,exe.readF32(0x151f2c),0],
+        target:[0,0,0],
+        distance:commonView.distance60,
+        pitchDegrees:exe.readF32(0x151f2c),
+        headingDegrees:exe.readF32(0x151b7c),
+        secondaryAngleDegrees:0,
         auxiliaryPair:[exe.readF32(0x151f28),commonView.auxiliary2],
       },
       {
         projection:{fovDegrees:commonView.fov20,near:commonView.near,far:commonView.far,frustumParameter0:commonView.frustum0,frustumParameter1:exe.readF32(0x151f30)},
-        position:[0,0,0],
-        orientationDegrees:[commonView.orientation60,exe.readF32(0x151f34),exe.readF32(0x151f38)],
-        auxiliaryPair:[commonView.orientation60,commonView.auxiliary2],
+        target:[0,0,0],
+        distance:commonView.distance60,
+        pitchDegrees:exe.readF32(0x151f34),
+        headingDegrees:exe.readF32(0x151f38),
+        secondaryAngleDegrees:0,
+        auxiliaryPair:[commonView.distance60,commonView.auxiliary2],
       },
       {
         projection:{fovDegrees:commonView.fov15,near:commonView.near,far:commonView.far,frustumParameter0:commonView.frustum0,frustumParameter1:commonView.frustum1},
-        position:[0,0,0],
-        orientationDegrees:[exe.readF32(0x151b70),exe.readF32(0x151b74),0],
+        target:[0,0,0],
+        distance:exe.readF32(0x151b70),
+        pitchDegrees:exe.readF32(0x151b74),
+        headingDegrees:exe.readF32(0x151b7c),
+        secondaryAngleDegrees:0,
         auxiliaryPair:[exe.readF32(0x151b70),commonView.auxiliary2],
       },
     ],
