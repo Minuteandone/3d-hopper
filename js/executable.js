@@ -11,6 +11,7 @@ function zstr(bytes,o,max=0x400){
 }
 
 const GAME_DESCRIPTOR_VA=0x191120;
+const THANKS_DESCRIPTOR_VA=0x1913b4;
 const STAGE_GLOBAL_INITIALIZER=0x16b424;
 const STARTUP_FLOOR_RECORD_VA=0x19e0c8;
 const CONTROL_DEGREES_SCALE_VA=0x1517d8;
@@ -246,6 +247,24 @@ export function liftHopperProgram(romOrBuffer){
     failY:exe.readF32(0x13cccc),
     verticalCollisionEpsilon:exe.readF32(0x13ccfc),
   };
+  const thanksNamePtr=exe.readU32(THANKS_DESCRIPTOR_VA);
+  const ending={
+    state3UpdateAddress:0x13e630,
+    counterResetAddress:0x13b74c,
+    risePerUpdate:exe.readF32(0x13e908),
+    introUpdates:60,
+    starShowerUpdate:240,
+    postShowerTimeoutUpdates:600,
+    starShowerEffectSlot:5,
+    starShowerY:exe.readF32(0x13e93c),
+    followYLimit:exe.readF32(0x13e944),
+    followYLerp:exe.readF32(0x13e94c),
+    frame60Controller:[exe.readF32(0x13e934),exe.readF32(0x13e934),exe.readF32(0x13e938),exe.readF32(0x13e920)],
+    state5TransitionUpdates:30,
+    thanksSceneDescriptor:THANKS_DESCRIPTOR_VA,
+    thanksSceneName:exe.readString(thanksNamePtr),
+  };
+
   const floorBuilder={
     recordStride:48,
     gridCenterFactor:exe.readF32(0x13c4d8),
@@ -262,10 +281,10 @@ export function liftHopperProgram(romOrBuffer){
       title:exe.meta.title,sceneName:exe.readString(sceneNamePtr),sceneNamePtr,factoryAddress:factory,
       routines:{
         floorBuilder:0x13c034,gameplayUpdate:0x13c81c,stageConstruction:0x13f550,
-        stateSetup:0x1517dc,stageGlobalInitializer:STAGE_GLOBAL_INITIALIZER,startupSetup:0x13f8c0,movingFloorUpdate:0x13dd58,
+        stateSetup:0x1517dc,stageGlobalInitializer:STAGE_GLOBAL_INITIALIZER,startupSetup:0x13f8c0,movingFloorUpdate:0x13dd58,endingUpdate:0x13e630,endingReset:0x13b74c,
       },
     },
-    stages,startupFloor,controls,physics,floorBuilder,
+    stages,startupFloor,controls,physics,ending,floorBuilder,
     initialState:{stageIndex:0,stage2ExtraCounter:2},
     executable:exe,
   };
