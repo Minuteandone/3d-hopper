@@ -243,6 +243,8 @@ export function liftHopperProgram(romOrBuffer){
     projectionOffsets:[136,200,264],
     viewOffsets:[328,376,424],
     inverseViewOffsets:[472,520,568],
+    followUpdateAddress:0x13e598,
+    followYLerp:exe.readF32(0x13e62c),
   };
 
   const physics={
