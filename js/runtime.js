@@ -19,7 +19,7 @@ export function activeStageRecords(program,state,stageIndex=state.stageIndex){
 }
 
 /** Translation of the runtime fields populated near the end of floor builder 0x13C034. */
-export function createFloorRuntime(record){
+export function createFloorRuntime(record,floorBuilder={collisionHeight:.4}){
   return {
     record,
     index:record.index,
@@ -29,7 +29,7 @@ export function createFloorRuntime(record){
     activeFlag:record.flag,
     secondaryFlag:0,
     width:record.columns*record.spacing,
-    halfHeight:.4,
+    height:floorBuilder.collisionHeight,
     depth:record.rows*record.spacing,
   };
 }
@@ -80,4 +80,45 @@ export function updateHorizontalVelocity(velocity,input,floorHitThisUpdate,physi
     next.z+=(tz-next.z)*physics.airVelocityLerp;
   }
   return next;
+}
+
+function pointOnSegmentAtY(start,end,y){
+  const dy=end.y-start.y;
+  if(dy===0)return null;
+  const t=(y-start.y)/dy;
+  return {
+    x:start.x+(end.x-start.x)*t,
+    y,
+    z:start.z+(end.z-start.z)*t,
+    t,
+  };
+}
+
+/**
+ * Translation of 0x1520A8. The incoming horizontalCollisionSize is added to
+ * the native X/Z extents before halving, so 0.8 expands each side by 0.4.
+ */
+export function floorContainsHorizontalPoint(floor,x,z,horizontalCollisionSize){
+  const halfX=(floor.width+horizontalCollisionSize)*.5;
+  const halfZ=(floor.depth+horizontalCollisionSize)*.5;
+  return x>=floor.center[0]-halfX&&x<=floor.center[0]+halfX&&
+         z>=floor.center[2]-halfZ&&z<=floor.center[2]+halfZ;
+}
+
+/** Translation of downward-facing helper 0x13F648. */
+export function intersectFloorTop(floor,start,end,horizontalCollisionSize){
+  const planeY=floor.center[1]+floor.height*.5;
+  if(start.y<planeY||end.y>planeY)return null;
+  const hit=pointOnSegmentAtY(start,end,planeY);
+  if(!hit||!floorContainsHorizontalPoint(floor,hit.x,hit.z,horizontalCollisionSize))return null;
+  return hit;
+}
+
+/** Translation of upward-facing helper 0x13F784. */
+export function intersectFloorBottom(floor,start,end,horizontalCollisionSize){
+  const planeY=floor.center[1]-floor.height*.5;
+  if(start.y>planeY||end.y<planeY)return null;
+  const hit=pointOnSegmentAtY(start,end,planeY);
+  if(!hit||!floorContainsHorizontalPoint(floor,hit.x,hit.z,horizontalCollisionSize))return null;
+  return hit;
 }
