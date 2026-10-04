@@ -30,6 +30,28 @@ const cat=parseModels(rom.get('gfx/hopper_cat.bcmdl')).find(m=>m.name==='neko_ho
 if(!cat) throw new Error('neko_hopping_model missing');
 if(cat.shapes.map(s=>s.vertexCount).join(',')!=='494,211,21') throw new Error('unexpected cat vertex counts');
 if(cat.skeleton?.bones.length!==24) throw new Error(`expected 24 cat bones, got ${cat.skeleton?.bones.length??0}`);
+
+const mat34=a=>[
+  [a[0],a[1],a[2],a[3]],
+  [a[4],a[5],a[6],a[7]],
+  [a[8],a[9],a[10],a[11]],
+  [0,0,0,1],
+];
+const mul4=(a,b)=>a.map((row,r)=>b[0].map((_,c)=>row.reduce((sum,v,k)=>sum+v*b[k][c],0)));
+const maxIdentityError=m=>Math.max(...m.flatMap((row,r)=>row.map((v,c)=>Math.abs(v-(r===c?1:0)))));
+const boneByJoint=new Map(cat.skeleton.bones.map(b=>[b.jointId,b]));
+const bindWorld=new Map();
+const worldFor=joint=>{
+  if(bindWorld.has(joint))return bindWorld.get(joint);
+  const bone=boneByJoint.get(joint),local=mat34(bone.localMatrix);
+  const world=bone.parentId<0?local:mul4(worldFor(bone.parentId),local);
+  bindWorld.set(joint,world);return world;
+};
+for(const bone of cat.skeleton.bones){
+  const error=maxIdentityError(mul4(worldFor(bone.jointId),mat34(bone.inverseBaseMatrix)));
+  if(error>3e-6)throw new Error(`${bone.name}: local hierarchy × inverse-base matrix error ${error}`);
+}
+
 if(cat.materials[0]?.textureRefs[0]!=='hopping'||!cat.materials[1]?.textureRefs.includes('nekopper')) throw new Error('cat material texture references were not recovered');
 if(cat.materials[0]?.blend?.colorSource!==1||cat.materials[0]?.blend?.colorDestination!==0) throw new Error('hopping material blend state mismatch');
 if(cat.materials[1]?.blend?.colorSource!==1||cat.materials[1]?.blend?.colorDestination!==0) throw new Error('nekopper material blend state mismatch');
