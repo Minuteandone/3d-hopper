@@ -43,6 +43,14 @@ const nekoMapper=cat.materials[1]?.textureMappers?.[1];
 if(nekoMapper?.textureName!=='nekopper'||nekoMapper.config!==0x2200||nekoMapper.wrapS!==2||nekoMapper.wrapT!==2||nekoMapper.minFilter!==0||nekoMapper.magFilter!==0)throw new Error('nekopper sampler state mismatch');
 const hoppingMat=cat.materials[0],nekopperMat=cat.materials[1];
 if(hoppingMat.visibleColorMapper!==0||nekopperMat.visibleColorMapper!==1)throw new Error('cat visible color mapper must come from TexEnv');
+if(hoppingMat.texCoordConfig!==0||nekopperMat.texCoordConfig!==3)throw new Error('cat texture-coordinate config mismatch');
+const hopCoord=hoppingMat.visibleTextureCoordinate,nekoCoord=nekopperMat.visibleTextureCoordinate;
+if(!hopCoord||hopCoord.sourceCoordinate!==0||hopCoord.mappingMethod!==0)throw new Error('hopping visible texture coordinate mismatch');
+if(!nekoCoord||nekoCoord.sourceCoordinate!==0||nekoCoord.mappingMethod!==0||nekoCoord.referenceCamera!==-1)throw new Error('nekopper visible texture coordinate mismatch');
+const identity34=[1,0,0,0,0,1,0,0,0,0,1,0];
+for(const [name,coord] of [['hopping',hopCoord],['nekopper',nekoCoord]])
+  for(let i=0;i<12;i++)if(Math.abs(coord.matrix[i]-identity34[i])>1e-6)throw new Error(`${name} visible texture matrix mismatch at ${i}`);
+if(Math.abs(nekopperMat.textureCoordinators[0].rotate-1.1170107126)>1e-6)throw new Error('nekopper mask-coordinate rotation mismatch');
 const hoppingStage0=hoppingMat.fragmentShader?.stages?.[0];
 if(hoppingStage0?.colorMode!==3||hoppingStage0?.alphaMode!==1||
    JSON.stringify(hoppingStage0.colorSources.slice(0,2))!=='[1,3]'||
