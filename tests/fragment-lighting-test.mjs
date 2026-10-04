@@ -1,4 +1,4 @@
-import { evaluateFragmentLighting, FragmentLightingFlags } from '../js/fragment-lighting.js';
+import { evaluateFragmentLighting, FragmentLightingFlags, decodeBumpSurface } from '../js/fragment-lighting.js';
 
 const constantTable=value=>({
   absolute:true,
@@ -71,3 +71,12 @@ eq4(out.primary,[0,0,0,1],'back primary');
 eq4(out.secondary,[0,0,0,1],'back secondary');
 
 console.log('PICA fragment-light equation OK');
+
+const bump=decodeBumpSurface({bumpMode:1,bumpRenormalize:true},[.6,.4,.2,.9]);
+if(!close(bump.normal[0],.2)||!close(bump.normal[1],-.2)||
+   !close(bump.normal[2],Math.sqrt(.92)))throw new Error(`bump normal mismatch ${JSON.stringify(bump.normal)}`);
+if(!close(bump.tangent[0],1)||!close(bump.tangent[1],0)||!close(bump.tangent[2],0))throw new Error('bump tangent fallback mismatch');
+
+const tangentMode=decodeBumpSurface({bumpMode:2,bumpRenormalize:false},[.75,.25,1,1]);
+if(!close(tangentMode.normal[2],1)||!close(tangentMode.tangent[0],.5)||
+   !close(tangentMode.tangent[1],-.5)||!close(tangentMode.tangent[2],1))throw new Error('tangent bump mode mismatch');
