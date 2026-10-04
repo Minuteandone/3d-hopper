@@ -6,6 +6,7 @@ import { decodeBcstm } from '../js/audio.js';
 import { parseModels } from '../js/models.js';
 import { parsePrototypeFragmentLights } from '../js/lights.js';
 import { parsePrototypeLuts, samplePrototypeAbsoluteLut } from '../js/luts.js';
+import { evaluateFragmentLighting } from '../js/fragment-lighting.js';
 
 const path=process.argv[2];
 if(!path) throw new Error('usage: node tests/rom-test.mjs /path/to/3D_Hopper.app');
@@ -191,6 +192,23 @@ if(Math.abs(samplePrototypeAbsoluteLut(d0,-1,1)-d0.samples[0])>1e-6||
    Math.abs(samplePrototypeAbsoluteLut(d0,1,1)-d0.samples[255])>1e-6)throw new Error('absolute LUT signed-domain mapping mismatch');
 if(Math.abs(samplePrototypeAbsoluteLut(lookup1,1,2)-1)>1e-6)throw new Error('LUT post-scale clamp mismatch');
 
+
+
+const lutMapForLighting=new Map(luts.map(l=>[l.name,l]));
+const lightForTest={
+  sceneAmbient:[0,0,0,1],
+  lightAmbient:[0,0,0,1],
+  lightDiffuse:[1,1,1,1],
+  lightSpecular0:[1,1,1,1],
+  lightSpecular1:[1,1,1,1],
+  normal:[0,0,1],view:[0,0,1],light:[0,0,1],
+};
+const hoppingLit=evaluateFragmentLighting({material:hoppingMat,lutMap:lutMapForLighting,...lightForTest});
+closeColor(hoppingLit.primary,[1,.67,.67,1],'hopping controlled primary light');
+closeColor(hoppingLit.secondary,[.6499,.1746,.97,1],'hopping controlled secondary light');
+const nekoLit=evaluateFragmentLighting({material:nekopperMat,lutMap:lutMapForLighting,...lightForTest});
+closeColor(nekoLit.primary,[.56,.61,.60,1],'nekopper controlled primary light');
+closeColor(nekoLit.secondary,[.2942,.1887,.0044,1],'nekopper controlled secondary light');
 
 const lights=parsePrototypeFragmentLights(rom.get('gfx/hopper_misc.bcmdl'));
 if(lights.length!==1||lights[0].name!=='Light1')throw new Error('expected one prototype Light1 CFLT');
