@@ -31,6 +31,18 @@ if(!cat) throw new Error('neko_hopping_model missing');
 if(cat.shapes.map(s=>s.vertexCount).join(',')!=='494,211,21') throw new Error('unexpected cat vertex counts');
 if(cat.skeleton?.bones.length!==24) throw new Error(`expected 24 cat bones, got ${cat.skeleton?.bones.length??0}`);
 if(cat.materials[0]?.textureRefs[0]!=='hopping'||!cat.materials[1]?.textureRefs.includes('nekopper')) throw new Error('cat material texture references were not recovered');
+if(cat.materials[0]?.blend?.colorSource!==1||cat.materials[0]?.blend?.colorDestination!==0) throw new Error('hopping material blend state mismatch');
+if(cat.materials[1]?.blend?.colorSource!==1||cat.materials[1]?.blend?.colorDestination!==0) throw new Error('nekopper material blend state mismatch');
+if(cat.shapes.map(s=>s.primitiveSets.map(p=>p.skinningMode)).flat().join(',')!=='2,2,2,0,0') throw new Error('cat skinning modes mismatch');
+for(const shape of cat.shapes)for(const ps of shape.primitiveSets)for(const prim of ps.primitives)for(const stream of prim.indexStreams)if(stream.primitiveMode!==0)throw new Error('unexpected cat primitive mode');
+const floor1=parseModels(rom.get('gfx/hopper_map_floor01.bcmdl')).find(m=>m.name==='hopper_floor01_model');
+const floor2=parseModels(rom.get('gfx/hopper_map_floor02.bcmdl')).find(m=>m.name==='hopper_floor02_model');
+for(const floor of [floor1,floor2]){
+  if(!floor)throw new Error('floor model missing');
+  const blend=floor.materials[0]?.blend;
+  if(blend?.colorSource!==6||blend?.colorDestination!==7)throw new Error(`${floor.name}: expected SRC_ALPHA/ONE_MINUS_SRC_ALPHA blend state`);
+}
+
 for(const modelPath of ['gfx/hopper_cat.bcmdl','gfx/hopper_map_floor01.bcmdl','gfx/hopper_map_floor02.bcmdl','gfx/hopper_title.bcmdl']){
   for(const model of parseModels(rom.get(modelPath))){
     for(const shape of model.shapes){
