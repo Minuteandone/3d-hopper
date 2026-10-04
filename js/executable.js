@@ -260,7 +260,7 @@ export function liftHopperProgram(romOrBuffer){
     followYLimit:exe.readF32(0x13e944),
     followYLerp:exe.readF32(0x13e94c),
     frame60Controller:[exe.readF32(0x13e934),exe.readF32(0x13e934),exe.readF32(0x13e938),exe.readF32(0x13e920)],
-    state5TransitionUpdates:30,
+    state5FadeArgument:30,
     thanksSceneDescriptor:THANKS_DESCRIPTOR_VA,
     thanksSceneName:exe.readString(thanksNamePtr),
   };
