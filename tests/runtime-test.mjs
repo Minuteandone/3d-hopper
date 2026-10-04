@@ -1,7 +1,7 @@
 import fs from 'node:fs';
 import { HopperRom } from '../js/rom.js';
 import { liftHopperProgram } from '../js/executable.js';
-import { createGameState,activeStageRecords,createFloorRuntime,tickFloorRuntime,noteFall,updateHorizontalVelocity,intersectFloorTop,intersectFloorBottom,floorContainsHorizontalPoint } from '../js/runtime.js';
+import { createGameState,activeStageRecords,createFloorRuntime,tickFloorRuntime,noteFall,updateHorizontalVelocity,intersectFloorTop,intersectFloorBottom,floorContainsHorizontalPoint,createEndingRuntime,tickEndingRuntime } from '../js/runtime.js';
 
 const path=process.argv[2]; if(!path)throw new Error('usage: node tests/runtime-test.mjs ROM');
 const b=fs.readFileSync(path),ab=b.buffer.slice(b.byteOffset,b.byteOffset+b.byteLength);const p=liftHopperProgram(new HopperRom(ab));
@@ -25,5 +25,27 @@ if(intersectFloorTop(testFloor,{x:3.41,y:11,z:0},{x:3.41,y:9,z:0},.8)!==null)thr
 if(!floorContainsHorizontalPoint(testFloor,-3.4,3.4,.8)||floorContainsHorizontalPoint(testFloor,-3.401,0,.8))throw new Error('native expanded floor bounds mismatch');
 const bottom=intersectFloorBottom(testFloor,{x:0,y:9,z:0},{x:0,y:11,z:0},.8);
 if(!bottom||Math.abs(bottom.y-9.8)>1e-6)throw new Error(`native bottom-plane collision mismatch ${JSON.stringify(bottom)}`);
+
+const ending=createEndingRuntime();
+for(let i=0;i<60;i++){
+  const tick=tickEndingRuntime(ending,p.ending);
+  if(Math.abs(tick.riseY-.42)>1e-6)throw new Error('ending rise mismatch');
+  if(tick.events.length)throw new Error(`unexpected ending event before 60: ${JSON.stringify(tick.events)}`);
+}
+let tick=tickEndingRuntime(ending,p.ending);
+if(ending.mainCounter!==61||tick.events[0]?.type!=='frame60-controller')throw new Error('ending frame-60 event mismatch');
+while(ending.mainCounter<240)tickEndingRuntime(ending,p.ending);
+tick=tickEndingRuntime(ending,p.ending);
+if(tick.events[0]?.type!=='starshower'||tick.events[0].slot!==5||tick.events[0].y!==65)throw new Error('ending frame-240 starshower mismatch');
+if(ending.state!==3||ending.mainCounter!==241)throw new Error('ending should remain state 3 through frame 240');
+tick=tickEndingRuntime(ending,p.ending,{confirm:true});
+if(ending.state!==5||tick.events[0]?.type!=='enter-state5'||tick.events[0].reason!=='confirm')throw new Error('ending confirm transition mismatch');
+
+const timeoutEnding=createEndingRuntime();
+while(timeoutEnding.mainCounter<=240)tickEndingRuntime(timeoutEnding,p.ending);
+for(let i=0;i<599;i++)tickEndingRuntime(timeoutEnding,p.ending);
+if(timeoutEnding.state!==3||timeoutEnding.postShowerCounter!==599)throw new Error('ending timeout fired early');
+tick=tickEndingRuntime(timeoutEnding,p.ending);
+if(timeoutEnding.state!==5||tick.events[0]?.reason!=='timeout')throw new Error('ending 600-update timeout mismatch');
 
 console.log('Translated stage runtime OK', {rescueCounter:s.stage2ExtraCounter,moverCenter:mover.center,moverVelocity:mover.velocity});
