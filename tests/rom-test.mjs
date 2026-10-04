@@ -4,6 +4,7 @@ import { HopperRom } from '../js/rom.js';
 import { parseTextures, decodeTexture, textureMapFromRom } from '../js/cgfx.js';
 import { decodeBcstm } from '../js/audio.js';
 import { parseModels } from '../js/models.js';
+import { parsePrototypeFragmentLights } from '../js/lights.js';
 
 const path=process.argv[2];
 if(!path) throw new Error('usage: node tests/rom-test.mjs /path/to/3D_Hopper.app');
@@ -134,6 +135,23 @@ for(const floor of [floor1,floor2]){
   const mapper=floor.materials[0]?.textureMappers?.[0];
   if(mapper?.config!==0x6||mapper.wrapS!==0||mapper.wrapT!==0||mapper.minFilter!==1||mapper.magFilter!==1)throw new Error(`${floor.name}: floor sampler state mismatch`);
 }
+
+
+const lights=parsePrototypeFragmentLights(rom.get('gfx/hopper_misc.bcmdl'));
+if(lights.length!==1||lights[0].name!=='Light1')throw new Error('expected one prototype Light1 CFLT');
+const light=lights[0];
+if(light.revision!==0x04000000||light.lightType!==0)throw new Error('Light1 revision/type mismatch');
+closeColor(light.ambient,[0,0,0,1],'Light1 ambient');
+closeColor(light.diffuse,[1,1,1,1],'Light1 diffuse');
+closeColor(light.specular0,[1,1,1,1],'Light1 specular0');
+closeColor(light.specular1,[1,1,1,1],'Light1 specular1');
+if(light.packed.ambient!==0xff000000||light.packed.diffuse!==0xffffffff||
+   light.packed.specular0!==0xffffffff||light.packed.specular1!==0xffffffff)throw new Error('Light1 packed colors mismatch');
+if(Math.abs(light.direction[0]-(-.5962848067))>1e-6||
+   Math.abs(light.direction[1]-(-.7453559637))>1e-6||
+   Math.abs(light.direction[2]-(-.2981424034))>1e-6||
+   Math.abs(light.directionLength-1)>1e-6)throw new Error(`Light1 direction mismatch ${JSON.stringify(light.direction)}`);
+if(light.distanceSamplerOffset!==0||light.angleSamplerOffset!==0)throw new Error('Light1 unexpectedly references attenuation LUTs');
 
 const titleModels=parseModels(rom.get('gfx/hopper_title.bcmdl'));
 for(const name of ['title_model','pressA_model','congratulations_model']){
