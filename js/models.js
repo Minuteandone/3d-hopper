@@ -222,6 +222,9 @@ export function textureCoordinateIndexForMapper(texCoordConfig,mapperIndex){
   return mapperIndex;
 }
 
+const LUT_INPUT_NAMES=['CosNormalHalf','CosViewHalf','CosNormalView','CosLightNormal','CosLightSpot','CosPhi'];
+const LUT_SCALE_VALUES=new Map([[0,1],[1,2],[2,4],[3,8],[6,.25],[7,.5]]);
+
 function readRev4LightingReference(bytes,view,offset){
   if(!offset)return null;
   checked(bytes,offset,0x0c,'rev-4 lighting LUT selector');
@@ -229,10 +232,13 @@ function readRev4LightingReference(bytes,view,offset){
   if(!sampler)return {offset,inputCommand:u32(view,offset),scaleCommand:u32(view,offset+4),sampler:null};
   checked(bytes,sampler,0x0c,'rev-4 lighting LUT reference');
   const type=u32(view,sampler);
+  const inputCommand=u32(view,offset),scaleCommand=u32(view,offset+4);
   return {
     offset,
-    inputCommand:u32(view,offset),
-    scaleCommand:u32(view,offset+4),
+    inputCommand,
+    inputName:LUT_INPUT_NAMES[inputCommand]??`Unknown(${inputCommand})`,
+    scaleCommand,
+    scaleValue:LUT_SCALE_VALUES.get(scaleCommand)??null,
     sampler:{
       offset:sampler,
       type,
