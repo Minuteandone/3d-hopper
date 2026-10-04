@@ -1,7 +1,7 @@
 import fs from 'node:fs';
 import { HopperRom } from '../js/rom.js';
 import { liftHopperProgram } from '../js/executable.js';
-import { createGameState,activeStageRecords,createFloorRuntime,tickFloorRuntime,noteFall,updateHorizontalVelocity,intersectFloorTop,intersectFloorBottom,floorContainsHorizontalPoint,createEndingRuntime,tickEndingRuntime,applyLowerSideCollision } from '../js/runtime.js';
+import { createGameState,activeStageRecords,createFloorRuntime,tickFloorRuntime,noteFall,updateHorizontalVelocity,intersectFloorTop,intersectFloorBottom,floorContainsHorizontalPoint,createEndingRuntime,tickEndingRuntime,applyLowerSideCollision,updateUpperCollisionPoint } from '../js/runtime.js';
 
 const path=process.argv[2]; if(!path)throw new Error('usage: node tests/runtime-test.mjs ROM');
 const b=fs.readFileSync(path),ab=b.buffer.slice(b.byteOffset,b.byteOffset+b.byteLength);const p=liftHopperProgram(new HopperRom(ab));
@@ -37,6 +37,13 @@ side=applyLowerSideCollision({x:-5,y:1,z:0},{x:-5,y:5.25,z:0},{x:3,y:0,z:0},[sla
 if(Math.abs(side.x-(-2))>1e-6)throw new Error('side clamp should ignore slabs outside vertical overlap');
 side=applyLowerSideCollision({x:-5,y:0,z:-5},{x:-5,y:4.25,z:-5},{x:3,y:0,z:3},[slab],.8);
 if(Math.abs(side.x-(-2))>1e-6||Math.abs(side.z-(-3.4))>1e-6)throw new Error(`X-then-Z corner ordering mismatch ${JSON.stringify(side)}`);
+
+const upperPhysics={upperLeanInputScale:.2,upperCollisionLength:4.25,upperHorizontalCollisionSize:1};
+let upper=updateUpperCollisionPoint({x:0,y:0,z:0},{x:0,y:4.25,z:0},{x:1,z:0},[],upperPhysics);
+if(Math.abs(upper.x-.85)>1e-6||Math.abs(upper.y-3.80131556)>1e-6||Math.abs(upper.z)>1e-6)throw new Error(`upper collision posture mismatch ${JSON.stringify(upper)}`);
+const roof={center:[0,3.5,0],width:6,height:.4,depth:6};
+upper=updateUpperCollisionPoint({x:0,y:0,z:0},{x:0,y:3,z:0},{x:0,z:0},[roof],upperPhysics);
+if(Math.abs(upper.y-3.3)>1e-6)throw new Error(`upper underside clamp mismatch ${JSON.stringify(upper)}`);
 
 const ending=createEndingRuntime();
 for(let i=0;i<60;i++){
