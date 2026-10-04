@@ -11,7 +11,7 @@ import { bcsarFromRom } from './bcsar.js';
 const $=s=>document.querySelector(s);
 const boot=$('#boot'),titleScreen=$('#titleScreen'),finish=$('#finish'),thanks=$('#thanks'),errorBox=$('#error');
 const touch=$('#touchControls'),status=$('#romStatus'),audioToggle=$('#audioToggle');
-let rom=null,assets=null,models=null,animations=null,emitters=null,soundCatalog=null,program=null,game=null,audio=null,nextStage=0,muted=false;
+let rom=null,assets=null,models=null,animations=null,emitters=null,soundCatalog=null,program=null,game=null,audio=null,muted=false;
 
 function show(el,on=true){el.classList.toggle('hidden',!on);}
 function fail(err){console.error(err);errorBox.textContent=err instanceof Error?err.message:String(err);show(errorBox,true);setTimeout(()=>show(errorBox,false),8000);}
@@ -43,14 +43,16 @@ async function openRom(file){
       onFalls:(n,meta)=>{
         if(meta.rebuild)status.textContent=`Original Stage 3 rescue counter: ${meta.rescueCounter}`;
       },
-      onWin:stats=>{
-        // Original state-3 completion timing is still being translated; do not
-        // fire HOPPER_BGM_CONGRATS at our placeholder collision boundary.
+      onEndingStart:()=>{
         audio?.stop();
-        nextStage=stats.final?0:stats.stageIndex+1;
-        $('#againButton').textContent=stats.final?'Play from Stage 1':'Next original stage';
-        $('#finishStats').textContent=`Stage ${stats.stage}/4 · ${stats.time.toFixed(1)} seconds · ${stats.falls} fall${stats.falls===1?'':'s'} · layout translated from ARM`;
-        show(touch,false);show(finish,true);
+        status.textContent='Final goal · native state 3 ending sequence';
+      },
+      onEndingEvent:event=>{
+        if(event.type==='starshower')status.textContent='Ending frame 240 · original starshower00 trigger reached';
+      },
+      onThanks:info=>{
+        audio?.stop();show(touch,false);show(finish,false);show(titleScreen,false);show(thanks,true);drawThanks();
+        status.textContent=`Native state 5 targets ${info.scene}; original global fade (argument ${info.fadeArgument}) is not yet translated`;
       }
     });
     game.bindTouch(touch);
@@ -68,7 +70,6 @@ function start(stage=0){
 }
 
 $('#startButton').addEventListener('click',()=>start(0));
-$('#againButton').addEventListener('click',()=>start(nextStage));
 $('#thanksButton').addEventListener('click',()=>{show(finish,false);show(thanks,true);drawThanks();});
 $('#backButton').addEventListener('click',()=>{audio?.stop();show(thanks,false);show(titleScreen,true);game?.pause();});
 audioToggle.addEventListener('click',()=>{muted=!muted;audio?.setMuted(muted);updateAudioButton();if(!muted&&game?.playing){try{audio?.playStageBgm();}catch(e){console.warn('ROM audio unavailable',e);}}});
