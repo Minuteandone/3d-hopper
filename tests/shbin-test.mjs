@@ -32,6 +32,18 @@ const expected=[
 if(JSON.stringify(outputs)!==JSON.stringify(expected))
   throw new Error(`DefaultShader output map mismatch ${JSON.stringify(outputs)}`);
 
+const labels=new Map(v.labels.map(label=>[label.name,label]));
+for(const [name,programOffsetWords,programWords] of [
+  ['l_internal_calc_quaternion_from_normal',397,11],
+  ['l_internal_calc_quaternion_from_tangent',409,62],
+  ['l_full_quaternion_calc_fallback',434,37],
+  ['l_full_quaternion_calc_end',470,1],
+]){
+  const label=labels.get(name);
+  if(!label||label.programOffsetWords!==programOffsetWords||label.programWords!==programWords)
+    throw new Error(`${name} DVLE label mismatch: ${JSON.stringify(label)}`);
+}
+
 const uniforms=new Map(v.uniforms.map(u=>[u.name,u]));
 const expectUniform=(name,start,end=start)=>{
   const u=uniforms.get(name);
@@ -55,5 +67,5 @@ expectUniform('TexMtx1',0x22,0x24);
 expectUniform('TexMtx2',0x25,0x27);
 expectUniform('NormMtx',0x28,0x2a);
 
-console.log({shader:shader.name,dvles:lib.executableCount,outputs,uniformCount:v.uniforms.length});
+console.log({shader:shader.name,dvles:lib.executableCount,outputs,labels:v.labels.map(x=>x.name),uniformCount:v.uniforms.length});
 console.log('embedded DefaultShader DVLE metadata OK');
