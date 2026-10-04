@@ -177,6 +177,10 @@ function readModel(bytes,view,offset){
     const revision=u32(view,o+8);
     if(revision!==0x04000000)throw new Error(`Unsupported Hopper MTOB revision 0x${revision.toString(16)}.`);
     // Verified against this prototype's rev-4 material layout.
+    const cullCommandParam=u32(view,o+0x11c);
+    const cullCommandHeader=u32(view,o+0x120);
+    if(cullCommandHeader!==0x00010040)throw new Error(`Unexpected Hopper face-culling command 0x${cullCommandHeader.toString(16)}.`);
+    const cullMode=cullCommandParam&3;
     const blendMode=u32(view,o+0x13c);
     const blendCommand1=u32(view,o+0x150);
     const blendCommand3=u32(view,o+0x158);
@@ -186,6 +190,7 @@ function readModel(bytes,view,offset){
     return {
       name:entry.name,offset:o,revision,
       textureRefs:readMaterialTextureRefs(bytes,view,o),
+      rasterization:{cullMode,commandParam:cullCommandParam,commandHeader:cullCommandHeader},
       blend:{mode:blendMode,enabled:blendEnabled,colorSource,colorDestination,command1:blendCommand1,command3:blendCommand3},
     };
   });
