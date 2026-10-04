@@ -139,6 +139,18 @@ function readSkeleton(bytes,view,offset){
   return {offset,name:cstr(bytes,rel32(view,offset+0x0c)),boneCount,scalingRule:u32(view,offset+0x24),flags:u32(view,offset+0x28),bones};
 }
 
+function readMaterialColor(view,offset){
+  const read4=o=>[f32(view,o),f32(view,o+4),f32(view,o+8),f32(view,o+12)];
+  return {
+    emission:read4(offset),
+    ambient:read4(offset+0x10),
+    diffuse:read4(offset+0x20),
+    specular0:read4(offset+0x30),
+    specular1:read4(offset+0x40),
+    constants:Array.from({length:6},(_,i)=>read4(offset+0x50+i*0x10)),
+  };
+}
+
 function readMaterialTextureMappers(bytes,view,materialOffset){
   // Prototype TexInfo mirrors the PICA texture-unit config at +0x24:
   // bit 1 mag filter, bit 2 min filter, bits 8..10 wrap T, bits 12..14 wrap S.
@@ -283,6 +295,8 @@ function readModel(bytes,view,offset){
     const revision=u32(view,o+8);
     if(revision!==0x04000000)throw new Error(`Unsupported Hopper MTOB revision 0x${revision.toString(16)}.`);
     // Verified against this prototype's rev-4 material layout.
+    const materialFlags=u32(view,o+0x18);
+    const materialColor=readMaterialColor(view,o+0x24);
     const cullCommandParam=u32(view,o+0x11c);
     const cullCommandHeader=u32(view,o+0x120);
     if(cullCommandHeader!==0x00010040)throw new Error(`Unexpected Hopper face-culling command 0x${cullCommandHeader.toString(16)}.`);
@@ -308,7 +322,7 @@ function readModel(bytes,view,offset){
       ?textureCoordinators[textureCoordinateIndexForMapper(texCoordConfig,visibleColorMapper)]??null
       :null;
     return {
-      name:entry.name,offset:o,revision,
+      name:entry.name,offset:o,revision,flags:materialFlags,materialColor,
       texCoordConfig,textureCoordinators,
       textureMappers,textureRefs,
       visibleColorMapper,visibleTextureCoordinate,
