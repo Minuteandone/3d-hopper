@@ -23,6 +23,8 @@ jobs:
           node --check js/runtime.js
           node --check js/cgfx.js
           node --check js/models.js
+          node --check js/lights.js
+          node --check js/luts.js
           node --check js/model-renderer.js
           node --check js/animation.js
           node --check js/emitters.js
